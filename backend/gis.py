@@ -431,6 +431,33 @@ def prefetch_overpass(coords, radius_m):
     return True
 
 
+def _once(key, fn, *args):
+    """Run fn(*args), or wait for the same call already running in another thread (the
+    background pre-load), so an analysis started mid-pre-load does not fetch twice."""
+    with _cache_lock:
+        fut = _inflight.get(key)
+        owner = fut is None
+        if owner:
+            fut = Future()
+            _inflight[key] = fut
+    if not owner:
+        return fut.result()
+    try:
+        out = fn(*args)
+        fut.set_result(out)
+        return out
+    except Exception as exc:
+        fut.set_exception(exc)
+        raise
+    finally:
+        with _cache_lock:
+            _inflight.pop(key, None)
+
+
+def _terrain_key(coords):
+    return "terrain:" + ";".join(f"{p[0]:.6f},{p[1]:.6f}" for p in coords)
+
+
 def prefetch_site(coords, radius_m):
     """Warm every external source the site analysis reads -- map data, elevation and
     NASA POWER climate -- in the background. Each is cached once fetched, so a later
@@ -440,8 +467,11 @@ def prefetch_site(coords, radius_m):
         return False
     prefetch_overpass(coords, radius_m)
     c = centroid(coords)
-    for fn, args in ((terrain_analysis, (coords,)), (fetch_climate, (round(c[0], 4), round(c[1], 4)))):
-        threading.Thread(target=lambda fn=fn, args=args: _swallow(fn, *args), daemon=True).start()
+    lat, lng = round(c[0], 4), round(c[1], 4)
+    for key, fn, args in ((_terrain_key(coords), terrain_analysis, (coords,)),
+                          (f"climate:{lat},{lng}", fetch_climate, (lat, lng))):
+        threading.Thread(target=lambda key=key, fn=fn, args=args: _swallow(_once, key, fn, *args),
+                         daemon=True).start()
     return True
 
 
@@ -600,18 +630,27 @@ OPENTOPODATA_URL = "https://api.opentopodata.org/v1/{dataset}"
 _RETRY_STATUS = {429, 500, 502, 503, 504}
 
 
-def _get_with_retry(url, params, tries=3):
+class RateLimited(RuntimeError):
+    """The service refused this address for now (HTTP 429)."""
+
+
+def _get_with_retry(url, params, tries=3, retry_429=True, base_sleep=1.5):
     """GET that waits and retries on rate-limit / server errors. Free elevation APIs answer a
-    shared cloud address (a hosted server) with 429 far more often than a home connection."""
+    shared cloud address (a hosted server) with 429 far more often than a home connection.
+    With retry_429=False a 429 fails at once: when the quota is per address, waiting a few
+    seconds does not lift it, and the next provider answers sooner."""
     last = None
     for attempt in range(tries):
         r = _http.get(url, params=params, timeout=ELEVATION_TIMEOUT_S)
         if r.status_code == 200:
             return r
         last = f"HTTP {r.status_code}"
+        if r.status_code == 429 and not retry_429:
+            raise RateLimited(last)
         if r.status_code not in _RETRY_STATUS:
             break
-        time.sleep(1.5 * (attempt + 1))
+        if attempt < tries - 1:
+            time.sleep(base_sleep * (attempt + 1))
     raise RuntimeError(last or "no response")
 
 
@@ -619,14 +658,32 @@ def _elevation_chunk(chunk):
     r = _get_with_retry(OPEN_METEO_ELEVATION_URL, {
         "latitude": ",".join(f"{p[0]:.6f}" for p in chunk),
         "longitude": ",".join(f"{p[1]:.6f}" for p in chunk),
-    })
+    }, tries=2, retry_429=False, base_sleep=0.5)
     values = r.json().get("elevation") or []
     if len(values) != len(chunk) or any(v is None for v in values):
         raise RuntimeError("incomplete elevation response")
     return [float(v) for v in values]
 
 
+# On the hosted server Open-Meteo answers the shared Render address with 429 for long
+# stretches. Its 3-try back-off then cost 4.5 s on every analysis before SRTM was asked
+# (9 Oct: ~7 s runs). After a 429 it is skipped for a while and SRTM answers directly.
+OPEN_METEO_COOLDOWN_S = 15 * 60
+_open_meteo_blocked_until = 0.0
+
+
 def _fetch_elevation_open_meteo(points):
+    global _open_meteo_blocked_until
+    if time.time() < _open_meteo_blocked_until:
+        raise RateLimited("skipped: rate-limited recently")
+    try:
+        return _fetch_elevation_open_meteo_now(points)
+    except RateLimited:
+        _open_meteo_blocked_until = time.time() + OPEN_METEO_COOLDOWN_S
+        raise
+
+
+def _fetch_elevation_open_meteo_now(points):
     chunks = [points[i:i + 100] for i in range(0, len(points), 100)]   # 100 points a call
     if len(chunks) == 1:
         return _elevation_chunk(chunks[0])
@@ -1571,8 +1628,9 @@ async def analyse_site(project, radius_m=500):
 
     (features, ov_status), (terrain, el_status), climate = await asyncio.gather(
         asyncio.to_thread(fetch_overpass, coords, radius_m),
-        asyncio.to_thread(terrain_analysis, coords),
-        asyncio.to_thread(fetch_climate, round(c[0], 4), round(c[1], 4)),
+        asyncio.to_thread(_once, _terrain_key(coords), terrain_analysis, coords),
+        asyncio.to_thread(_once, f"climate:{round(c[0], 4)},{round(c[1], 4)}",
+                          fetch_climate, round(c[0], 4), round(c[1], 4)),
     )
     # The public mirrors rate-limit bursts; one short pause and a second race usually gets
     # an answer, and a result missing every road and lake is worse than a slower one.

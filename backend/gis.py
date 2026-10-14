@@ -329,7 +329,7 @@ import hashlib
 import json as _json
 import os
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, as_completed, wait
 
 _CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".gis_cache")
 _CACHE_TTL_S = 7 * 24 * 3600
@@ -732,6 +732,16 @@ ELEVATION_PROVIDERS = (
 )
 
 
+ELEVATION_HEAD_START_S = 1.2
+
+
+def _good_elevation(fut, points):
+    if not fut.done() or fut.exception() is not None:
+        return False
+    v = fut.result()
+    return v is not None and len(v) == len(points)
+
+
 def fetch_elevation(points):
     # Ground levels do not change, so a re-run of the same plot reads them from the cache
     # the map data already uses instead of asking the elevation service again.
@@ -740,7 +750,30 @@ def fetch_elevation(points):
     if cached is not None and len(cached.get("values") or []) == len(points):
         return cached["values"], {"ok": True, "endpoint": cached.get("source") or "cache"}
     errors = []
-    for name, fetch in ELEVATION_PROVIDERS:
+    # Open-Meteo (Copernicus) is preferred and gets a short head start; if it has not
+    # answered by then, NASA SRTM is asked too and the first complete answer wins. On the
+    # hosted server one of them is often slow or refusing, and asking them one after the
+    # other cost seconds on every analysis.
+    racers = ELEVATION_PROVIDERS[:2]
+    pool = ThreadPoolExecutor(max_workers=len(racers))
+    try:
+        futs = {pool.submit(racers[0][1], points): racers[0][0]}
+        done, _ = wait(set(futs), timeout=ELEVATION_HEAD_START_S)
+        if not done or not _good_elevation(next(iter(done)), points):
+            futs[pool.submit(racers[1][1], points)] = racers[1][0]
+        pending = set(futs)
+        while pending:
+            done, pending = wait(pending, return_when=FIRST_COMPLETED)
+            for fut in done:
+                name = futs[fut]
+                if _good_elevation(fut, points):
+                    values = fut.result()
+                    _cache_write(key, {"values": values, "source": name})
+                    return values, {"ok": True, "endpoint": name}
+                errors.append(f"{name}: {fut.exception() or 'incomplete response'}")
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+    for name, fetch in ELEVATION_PROVIDERS[2:]:
         try:
             values = fetch(points)
         except Exception as exc:
@@ -748,8 +781,7 @@ def fetch_elevation(points):
             continue
         if len(values) == len(points):
             _cache_write(key, {"values": values, "source": name})
-            if errors:
-                logger.warning("Elevation served by %s after: %s", name, "; ".join(errors))
+            logger.warning("Elevation served by %s after: %s", name, "; ".join(errors))
             return values, {"ok": True, "endpoint": name}
         errors.append(f"{name}: incomplete response")
     logger.warning("Elevation unavailable for %d points: %s", len(points), "; ".join(errors))
@@ -1231,6 +1263,7 @@ _MONTH_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 NASA_POWER_URL = "https://power.larc.nasa.gov/api/temporal/climatology/point"
 NASA_TIMEOUT_S = 10
+CLIMATE_WAIT_S = 4.0   # longest an analysis waits on NASA POWER before using the model
 _MONTHS = ("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC")
 
 
@@ -1626,16 +1659,34 @@ async def analyse_site(project, radius_m=500):
     radius_m = max(100, min(int(radius_m or 500), 2000))
     c = centroid(coords)
 
-    (features, ov_status), (terrain, el_status), climate = await asyncio.gather(
-        asyncio.to_thread(fetch_overpass, coords, radius_m),
-        asyncio.to_thread(_once, _terrain_key(coords), terrain_analysis, coords),
-        asyncio.to_thread(_once, f"climate:{round(c[0], 4)},{round(c[1], 4)}",
-                          fetch_climate, round(c[0], 4), round(c[1], 4)),
+    timings = {}
+
+    async def timed(name, fn, *args):
+        t0 = time.time()
+        try:
+            return await asyncio.to_thread(fn, *args)
+        finally:
+            timings[name] = round(time.time() - t0, 2)
+
+    climate_task = asyncio.ensure_future(timed(
+        "climate", _once, f"climate:{round(c[0], 4)},{round(c[1], 4)}",
+        fetch_climate, round(c[0], 4), round(c[1], 4)))
+    (features, ov_status), (terrain, el_status) = await asyncio.gather(
+        timed("map_data", fetch_overpass, coords, radius_m),
+        timed("elevation", _once, _terrain_key(coords), terrain_analysis, coords),
     )
+    # NASA POWER is sometimes slow from the hosted server. Waiting is capped: past the cap
+    # this run uses the built-in solar model and the download finishes in the background,
+    # so the next run of the site reads NASA's figures from the cache.
+    try:
+        climate = await asyncio.wait_for(asyncio.shield(climate_task), timeout=CLIMATE_WAIT_S)
+    except asyncio.TimeoutError:
+        climate = None
+        timings["climate"] = f">{CLIMATE_WAIT_S:g} (model used; NASA data cached for next run)"
     # The public mirrors rate-limit bursts; one short pause and a second race usually gets
     # an answer, and a result missing every road and lake is worse than a slower one.
     if not ov_status.get("ok"):
-        await asyncio.sleep(4)
+        await asyncio.sleep(1)
         features, ov_status = await asyncio.to_thread(fetch_overpass, coords, radius_m)
     capped = ov_status.pop("capped", {}) if isinstance(ov_status, dict) else {}
     flood = flood_risk(terrain, features["water"], features.get("drains"))
@@ -1691,7 +1742,7 @@ async def analyse_site(project, radius_m=500):
         "accessibility": access,
         "suitability": suit,
         "buildability": build,
-        "sources": {"overpass": ov_status, "elevation": el_status},
+        "sources": {"overpass": ov_status, "elevation": el_status, "timings_s": timings},
         # The stored narrative describes numbers computed under specific rules. Carrying
         # it across a re-run is only safe while the boundary AND the rules are unchanged;
         # otherwise the report quotes a flood level the engine no longer reports.

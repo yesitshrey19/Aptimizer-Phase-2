@@ -431,6 +431,20 @@ def prefetch_overpass(coords, radius_m):
     return True
 
 
+def prefetch_site(coords, radius_m):
+    """Warm every external source the site analysis reads -- map data, elevation and
+    NASA POWER climate -- in the background. Each is cached once fetched, so a later
+    "Run site analysis" mostly reads the cache instead of waiting on three services.
+    The keys match analyse_site exactly. Returns at once; failures only mean a slower run."""
+    if len(coords) < 3:
+        return False
+    prefetch_overpass(coords, radius_m)
+    c = centroid(coords)
+    for fn, args in ((terrain_analysis, (coords,)), (fetch_climate, (round(c[0], 4), round(c[1], 4)))):
+        threading.Thread(target=lambda fn=fn, args=args: _swallow(fn, *args), daemon=True).start()
+    return True
+
+
 def _swallow(fn, *args):
     try:
         fn(*args)

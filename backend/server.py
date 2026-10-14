@@ -1248,12 +1248,12 @@ async def get_gis(project_id: str, user: dict = Depends(get_current_user)):
 
 @api.post("/projects/{project_id}/gis/prefetch")
 async def prefetch_gis(project_id: str, body: GisIn, user: dict = Depends(get_current_user)):
-    """Warm the map-data cache for this site so a later analysis does not wait on the
-    public Overpass mirrors. Returns immediately; the download runs in the background."""
+    """Warm the map-data, elevation and climate caches for this site so a later analysis
+    does not wait on the public services. Returns immediately; downloads run in the background."""
     proj = await load_project(project_id, user)
     coords = (proj.get("plot") or {}).get("coordinates") or []
     radius = max(100, min(int(body.radius_m or 500), 2000))
-    return {"started": gislib.prefetch_overpass(coords, radius)}
+    return {"started": gislib.prefetch_site(coords, radius)}
 
 
 @api.post("/projects/{project_id}/gis/analyse")

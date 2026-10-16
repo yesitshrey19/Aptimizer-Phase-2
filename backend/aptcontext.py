@@ -120,6 +120,8 @@ def engineering_summary(eng: Dict[str, Any]) -> Dict[str, Any]:
     for mid, m in (eng.get("modules") or {}).items():
         outputs = []
         for o in (m.get("outputs") or []):
+            if o.get("assistant") is False:
+                continue                     # shown on screen, not needed in conversation
             cl = o.get("clause") or {}
             # One string rather than two keys: "IS 875 (Part 1):1987 Table 1" is what a
             # citation looks like anyway, and it is what the guard parses on the way back.

@@ -104,10 +104,17 @@ def tower_metrics(tower, cfg):
         "name": tower.get("name"),
         "floors": floors,
         "floor_height": fh,
-        "height_m": floors * fh,
+        "height_m": (floors - 1) * fh + float(tower.get("ground_floor_height") or fh) if floors else 0.0,
         "units_per_floor": units_per_floor,
         "total_units": units_total,
         "footprint_sqm": float(tower.get("footprint_area") or 0),
+        # Optional plan dimensions and ground-storey height: IS 1893 Cl. 7.6.2(c) takes the
+        # period from the base dimension along each direction, and Cl. 7.6.3 distributes
+        # base shear by actual floor levels. Absent, seismic falls back to a square plan
+        # and uniform storeys.
+        "plan_x_m": float(tower.get("plan_x_m") or 0),
+        "plan_y_m": float(tower.get("plan_y_m") or 0),
+        "ground_floor_height": float(tower.get("ground_floor_height") or 0) or None,
         "carpet_sqm": carpet,
         "balcony_sqm": balcony,
         "builtup_per_floor_sqm": builtup_per_floor,

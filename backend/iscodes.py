@@ -190,6 +190,35 @@ LIVE_LOADS = {  # kN/m²
 
 # ---------------------------------------------------------------- IS 875 Part 3
 WIND_K2 = [(10, 1.00), (15, 1.05), (20, 1.07), (30, 1.12), (50, 1.17), (100, 1.24), (150, 1.28), (200, 1.30)]
+
+
+# IS 456:2000 Table 18, limit state of collapse: (label, dead factor, live factor). The
+# lateral load (EL or WL) factor is part of the label; only the gravity factors are applied.
+# EL stands for EL or WL, whichever is being combined.
+LOAD_COMBINATIONS = [
+    ("1.5(DL+LL)", 1.5, 1.5),
+    ("1.5(DL±EL)", 1.5, 0.0),
+    ("1.2(DL+LL±EL)", 1.2, 1.2),
+    ("0.9DL±1.5EL", 0.9, 0.0),
+]
+
+
+def wind_k2(height_m):
+    """k2 at a height, terrain category 2, IS 875 (Part 3):2015 Table 2.
+
+    Linear between the table's heights, as the Table 2 note permits; the 10 m value below
+    10 m and the 200 m value above it. Taking the next row up instead (Phase II fix 4) gave a
+    12 m building the 15 m factor.
+    """
+    h = float(height_m or 0)
+    if h <= WIND_K2[0][0]:
+        return WIND_K2[0][1]
+    for (h0, k0), (h1, k1) in zip(WIND_K2, WIND_K2[1:]):
+        if h <= h1:
+            return k0 + (k1 - k0) * (h - h0) / (h1 - h0)
+    return WIND_K2[-1][1]
+
+
 WIND_KD = 0.90  # Cl. 7.2.1 wind directionality (buildings); 1.0 in cyclone-affected regions
 
 # IS 875 (Part 3):2015 Cl. 7.2.1: "For the cyclone affected regions also the factor Kd shall be
@@ -274,9 +303,10 @@ DEFAULT_FRAME_TYPE = "brick_infill"   # residential apartments are infilled by d
 def seismic_period(height_m, base_dim_m, frame_type="brick_infill"):
     """Approximate Ta per IS 1893 (Part 1):2016 Cl. 7.6.2.
 
-    Returns (Ta, formula description). For infilled and wall systems the code period is
-    taken as the governing (shorter) of the applicable expression and the bare-frame one,
-    since a shorter period is the conservative choice for design base shear.
+    Returns (Ta, formula description). ``base_dim_m`` is d, the base dimension along the
+    direction of the lateral force. An infilled frame takes Cl. 7.6.2(c), 0.09 h / sqrt(d),
+    exactly as written: the clause gives no minimum against the bare-frame expression, so
+    none is taken (Phase II fix 6).
     """
     h = max(float(height_m), 3.0)
     bare = 0.075 * h ** 0.75
@@ -287,9 +317,10 @@ def seismic_period(height_m, base_dim_m, frame_type="brick_infill"):
     infilled = 0.09 * h / math.sqrt(d)
     if frame_type == "shear_wall":
         # Cl. 7.6.2(d) needs the shear wall area Aw, which this tool does not model, so
-        # the infill expression is used as a stand-in and reported as such.
+        # the infill expression is used as a stand-in, bounded by the bare frame, and
+        # reported as an approximation.
         return min(bare, infilled), f"0.09 h / sqrt(d), d = {d:.1f} m (wall system approximation)"
-    return min(bare, infilled), f"0.09 h / sqrt(d), d = {d:.1f} m (brick infill)"
+    return infilled, f"0.09 h / sqrt(d), d = {d:.1f} m (brick infill, Cl. 7.6.2(c))"
 SOIL_SEISMIC_TYPE = {
     "hard rock": "I", "gravel": "II", "dense sand": "II", "stiff clay": "II", "soft clay": "III",
 }

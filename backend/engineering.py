@@ -131,6 +131,13 @@ def m1_structural_loads(project, base, e, city):
     floors = max(int(b["floors"]), 1)
     column_load_raw = factored_raw * trib * floors
     column_load = round(column_load_raw, 1)
+    # IS 456 Table 18, limit state of collapse (Phase II fix 7). Each combination's GRAVITY
+    # share of the interior-column axial load. The EL/WL share needs a frame analysis this
+    # module does not do, so it is named, not invented; for an interior column under gravity
+    # 1.5(DL + LL) governs, which is the load the column is sized for.
+    combo_axial = [(label, (gf_dead * dead_raw + gf_live * live) * trib * floors)
+                   for label, gf_dead, gf_live in C.LOAD_COMBINATIONS]
+    governing_combo = max(combo_axial, key=lambda c: c[1])[0]
 
     # Grades come from the project, not a fixed M25/Fe415 — picking M40 in the mix design
     # module used to leave the column sized as if it were still M25.
@@ -162,7 +169,7 @@ def m1_structural_loads(project, base, e, city):
 
     vb = city.get("wind_speed", 39.0)
     height_m = float(b.get("height_m") or (floors * floor_ht))
-    k2 = next((v for h, v in C.WIND_K2 if height_m <= h), C.WIND_K2[-1][1])
+    k2 = round(C.wind_k2(height_m), 4)                # Table 2, interpolated
     k1 = float(e.get("wind_k1") or 1.0)
     k3 = float(e.get("wind_k3") or 1.0)
     vz = vb * k1 * k2 * k3 * C.WIND_K4      # IS 875-3 Cl. 6.3
@@ -227,6 +234,12 @@ def m1_structural_loads(project, base, e, city):
             out("Factored load (1.5 DL + 1.5 LL)", factored, "kN/m²", "load_combo"),
             out("Tributary area per column", round(trib, 2), "m²", "column_design", f"{e['grid_bay_x_m']} × {e['grid_bay_y_m']} m bay"),
             out("Factored axial load per column", column_load, "kN", "column_design", f"over {floors} floors"),
+            # On screen for the Table 18 check, but left out of the assistant's context: the
+            # governing figure is already the factored column load above.
+            {**out("Load combinations, gravity axial",
+                   " · ".join(f"{label} {round(p_raw)}" for label, p_raw in combo_axial), "kN",
+                   "load_combo", f"{governing_combo} governs; EL/WL needs frame analysis"),
+             "assistant": False},
             out("Recommended column size", f"{int(col_b)} × {int(col_d)}", "mm", "column_design",
                 f"{p * 100:g}% steel, M{int(fck)}/Fe{int(fy)}"),
             out("Slenderness ratio (least dimension)", slenderness, "", "column_slender",
@@ -251,7 +264,12 @@ def m1_structural_loads(project, base, e, city):
         "per_tower": [_tower_loads(t, e, city, factored_raw, trib, dead_raw, live, pd_raw) for t in b["towers"]],
         "derived": {"dead": dead, "dead_raw": dead_raw, "live": live, "factored": factored, "factored_raw": factored_raw,
                     "column_load": column_load, "column_load_raw": column_load_raw,
+
                     "tributary": trib, "service": service, "service_raw": service_raw, "pd": pd, "pd_raw": pd_raw},
+        # Read by the seismic module only, kept out of `derived` so the assistant's context
+        # does not carry it. Roof weight per Cl. 7.3.2: the floor dead load unless a roof
+        # figure is given (the conservative side).
+        "seismic_inputs": {"roof_dead_raw": float(e.get("roof_dead_load_kn_sqm") or dead_raw)},
     }
 
 
@@ -267,7 +285,7 @@ def _tower_loads(t, e, city, factored_raw, trib, dead, live, pd):
     col_raw = factored_raw * trib * floors
     col = round(col_raw, 1)
     k1 = float(e.get("wind_k1") or 1.0)
-    k2 = next((v for h, v in C.WIND_K2 if t["height_m"] <= h), C.WIND_K2[-1][1])
+    k2 = round(C.wind_k2(t["height_m"]), 4)
     k3 = float(e.get("wind_k3") or 1.0)
     pz_t_raw = 0.6 * (city["wind_speed"] * k1 * k2 * k3 * C.WIND_K4) ** 2 / 1000.0
     pd_t_raw = max(pz_t_raw * C.wind_kd(city.get("city")) * C.WIND_KA * C.WIND_KC,
@@ -288,6 +306,46 @@ def _tower_loads(t, e, city, factored_raw, trib, dead, live, pd):
 
 
 # ================================================================ 2. seismic
+def spectral_acceleration(T, soil_type):
+    """Sa/g for the equivalent static method, IS 1893 (Part 1):2016 Cl. 6.4.2, Fig. 2."""
+    if soil_type == "I":
+        return 2.5 if T < 0.40 else min(1.00 / T, 2.5) if T <= 4 else 0.25
+    if soil_type == "II":
+        return 2.5 if T < 0.55 else min(1.36 / T, 2.5) if T <= 4 else 0.34
+    return 2.5 if T < 0.67 else min(1.67 / T, 2.5) if T <= 4 else 0.42
+
+
+def seismic_live_fraction(live_kn_sqm):
+    """Table 10: share of imposed floor load lumped into seismic weight (25% up to 3 kN/m2)."""
+    return 0.25 if float(live_kn_sqm) <= 3.0 else 0.50
+
+
+def storey_seismic_weights(floors, floor_area_sqm, dead, live, roof_dead=None):
+    """Wi for storeys 1..n (bottom to top), IS 1893 (Part 1):2016 Cl. 7.3.
+
+    Floors carry their dead load plus the Table 10 share of imposed load. The roof carries
+    its dead load and NO imposed load (Cl. 7.3.2) -- adding it, as the single
+    "(DL + 25% LL) x built-up" figure used to, over-states W by a storey's worth of live load.
+    """
+    n = max(int(floors), 1)
+    floor_w = float(floor_area_sqm) * (float(dead) + seismic_live_fraction(live) * float(live))
+    roof_w = float(floor_area_sqm) * float(dead if roof_dead is None else roof_dead)
+    return [floor_w] * (n - 1) + [roof_w]
+
+
+def storey_levels(floors, floor_height, first_storey_height=None):
+    """hi, the height of each floor level above the base, bottom to top."""
+    first = float(first_storey_height or floor_height)
+    return [first + i * float(floor_height) for i in range(max(int(floors), 1))]
+
+
+def storey_forces(base_shear, weights, levels):
+    """Qi = VB Wi hi^2 / sum(Wj hj^2), bottom to top. IS 1893 (Part 1):2016 Cl. 7.6.3."""
+    terms = [w * h * h for w, h in zip(weights, levels)]
+    total = math.fsum(terms)
+    return [base_shear * t / total if total else 0.0 for t in terms]
+
+
 def m2_seismic(project, base, e, city, loads):
     b = _building(project, base)
     zone = city["zone"]
@@ -296,17 +354,15 @@ def m2_seismic(project, base, e, city, loads):
     soil_type = C.SOIL_SEISMIC_TYPE.get(soil, "II")
     h = max(b["height_m"], 3.0)
     frame_type = e["frame_type"] if e["frame_type"] in C.SEISMIC_FRAME_TYPES else C.DEFAULT_FRAME_TYPE
-    base_dim = math.sqrt(max(b["footprint"], 1.0)) if b["footprint"] else 0.0
-    ta_raw, ta_formula = C.seismic_period(h, base_dim, frame_type)
+    tallest = b["tallest"] or {}
+    dims = _plan_dims(tallest) if tallest else (None, None)
+    if not dims[0]:
+        base_dim = math.sqrt(max(b["footprint"], 1.0)) if b["footprint"] else 0.0
+        dims = (base_dim, base_dim)
+    ta_raw, ta_formula, ta_dir = _governing_period(h, dims, frame_type, soil_type)
     ta = round(ta_raw, 3)
     ta_bare = round(0.075 * h ** 0.75, 3)
-
-    def sa_g(T, st):
-        if st == "I":
-            return 2.5 if T < 0.40 else min(1.00 / T, 2.5) if T <= 4 else 0.25
-        if st == "II":
-            return 2.5 if T < 0.55 else min(1.36 / T, 2.5) if T <= 4 else 0.34
-        return 2.5 if T < 0.67 else min(1.67 / T, 2.5) if T <= 4 else 0.42
+    sa_g = spectral_acceleration
 
     sa_raw = sa_g(ta_raw, soil_type)
     sa = round(sa_raw, 3)
@@ -318,8 +374,11 @@ def m2_seismic(project, base, e, city, loads):
     ah_raw, ah_floored = C.ah_with_minimum(z * imp * sa_raw / (2 * r), zone)
     ah = round(ah_raw, 5)
     dead_for_seismic = loads["derived"].get("dead_raw", loads["derived"]["dead"])
-    seismic_load = dead_for_seismic + 0.25 * loads["derived"]["live"]
-    w_raw = seismic_load * b["builtup"]
+    live = loads["derived"]["live"]
+    # Cl. 7.3: summed storey by storey, so the roof carries no imposed load and the
+    # Table 10 share of live load follows the load class instead of a fixed 25%.
+    roof_dead = (loads.get("seismic_inputs") or {}).get("roof_dead_raw")
+    w_raw = math.fsum(math.fsum(_tower_weights(t, dead_for_seismic, live, roof_dead)) for t in b["towers"])
     v_raw = ah_raw * w_raw
     w = round(w_raw, 1)
     v = round(v_raw, 1)
@@ -355,7 +414,7 @@ def m2_seismic(project, base, e, city, loads):
             out("Seismic zone", zone, "", "seismic_zone", f"{city['city']}, {city['state']} ({city['source']} data)"),
             out("Zone factor Z", z, "", "seismic_zone"),
             out("Soil / site type", f"Type {soil_type} — {C.SOILS.get(soil, {}).get('label', soil)}", "", "seismic_sa"),
-            out("Fundamental period Ta", ta, "s", "seismic_period", ta_formula),
+            out("Fundamental period Ta", ta, "s", "seismic_period", f"{ta_formula}, {ta_dir}"),
             out("Frame type", C.SEISMIC_FRAME_TYPES[frame_type], "", "seismic_period",
                 (f"bare-frame period would be {ta_bare} s — using it on an infilled frame "
                  "under-states base shear") if frame_type != "bare_frame" else ""),
@@ -364,34 +423,70 @@ def m2_seismic(project, base, e, city, loads):
             out("Importance factor I", imp, "", "seismic_I", imp_basis),
             out("Design horizontal coefficient Ah", ah, "", "base_shear",
                 f"Table 7 minimum for Zone {zone} governs" if ah_floored else "Z·I·(Sa/g) ÷ 2R"),
-            out("Seismic weight W", w, "kN", "seismic_weight", "DL + 25% LL over built-up area"),
+            out("Seismic weight W", w, "kN", "seismic_weight",
+                f"DL + {int(seismic_live_fraction(live) * 100)}% LL, roof DL only"),
             out("Design base shear VB", v, "kN", "base_shear"),
             out("Base shear as % of W", round(ah_raw * 100, 2), "%", "base_shear"),
         ],
         "recommendation": {"label": "Recommended lateral system", "value": system, "clause": C.clause("seismic_R")},
         "per_tower": [_tower_seismic(t, z, soil_type, r,
                                      C.importance_factor(e["importance"], t.get("occupants") or 0)[0],
-                                     sa_g, loads, frame_type, zone)
+                                     spectral_acceleration, loads, frame_type, zone)
                       for t in b["towers"]],
         "derived": {"base_shear": v, "vb_kn": v, "ah": ah, "seismic_weight": w},
     }
 
 
+def _plan_dims(t):
+    """(dx, dy) in metres when the tower carries its plan dimensions, else (None, None)."""
+    dx, dy = float(t.get("plan_x_m") or 0), float(t.get("plan_y_m") or 0)
+    return (dx, dy) if dx > 0 and dy > 0 else (None, None)
+
+
+def _governing_period(h, dims, frame_type, soil_type):
+    """Ta in each plan direction (Cl. 7.6.2(c) uses d ALONG the force); the direction with
+    the larger Sa/g governs the design coefficient. Returns (Ta, formula, direction)."""
+    runs = []
+    for label, d in (("X", dims[0]), ("Y", dims[1])):
+        ta, formula = C.seismic_period(h, d, frame_type)
+        runs.append((spectral_acceleration(ta, soil_type), ta, formula, label))
+    sa, ta, formula, label = max(runs, key=lambda r: (r[0], -r[1]))
+    return ta, formula, label if dims[0] != dims[1] else "X and Y"
+
+
+def _tower_weights(t, dead, live, roof_dead=None):
+    floors = max(int(t["floors"]), 1)
+    area = float(t["builtup_sqm"]) / floors if floors else 0.0
+    return storey_seismic_weights(floors, area, dead, live, roof_dead)
+
+
 def _tower_seismic(t, z, soil_type, r, imp, sa_g, loads, frame_type="brick_infill", zone=""):
     h = max(t["height_m"], 3.0)
-    base_dim = math.sqrt(max(t["footprint_sqm"], 1.0)) if t["footprint_sqm"] else 0.0
-    ta_raw = C.seismic_period(h, base_dim, frame_type)[0]
+    dims = _plan_dims(t)
+    if not dims[0]:
+        base_dim = math.sqrt(max(t["footprint_sqm"], 1.0)) if t["footprint_sqm"] else 0.0
+        dims = (base_dim, base_dim)
+    ta_raw = _governing_period(h, dims, frame_type, soil_type)[0]
     ta = round(ta_raw, 3)
     sa_raw = sa_g(ta_raw, soil_type)
     sa = round(sa_raw, 3)
     ah_raw = C.ah_with_minimum(z * imp * sa_raw / (2 * r), zone)[0]
     ah = round(ah_raw, 5)
     dead_for_seismic = loads["derived"].get("dead_raw", loads["derived"]["dead"])
-    w_raw = (dead_for_seismic + 0.25 * loads["derived"]["live"]) * t["builtup_sqm"]
+    weights = _tower_weights(t, dead_for_seismic, loads["derived"]["live"],
+                             (loads.get("seismic_inputs") or {}).get("roof_dead_raw"))
+    w_raw = math.fsum(weights)
     w = round(w_raw, 1)
+    vb_raw = ah_raw * w_raw
+    levels = storey_levels(t["floors"], t.get("floor_height") or 3.0, t.get("ground_floor_height"))
+    forces = storey_forces(vb_raw, weights, levels)
     return {"id": t["id"], "name": t["name"], "floors": t["floors"], "height_m": t["height_m"],
             "period_s": ta, "sa_g": sa, "ah": ah, "seismic_weight_kn": w,
-            "base_shear_kn": round(ah_raw * w_raw, 1), "base_shear_pct_w": round(ah_raw * 100, 2)}
+            "base_shear_kn": round(vb_raw, 1), "base_shear_pct_w": round(ah_raw * 100, 2),
+            # Cl. 7.6.3, roof first so the table reads top-down like the code's own examples.
+            "storey_forces": [{"level": i + 1, "height_m": round(lv, 2), "weight_kn": round(wt, 1),
+                               "force_kn": round(q, 1)}
+                              for i, (lv, wt, q) in enumerate(zip(levels, weights, forces))][::-1]}
 
 
 # ================================================================ 3. foundation

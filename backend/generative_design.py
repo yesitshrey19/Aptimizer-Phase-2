@@ -182,9 +182,9 @@ def generate_parking_layout(footprint_sqm: float, layout_type: str = "orthogonal
     """Generates procedural parking bay grid and circulation aisles."""
     area = max(float(footprint_sqm or 3000.0), 500.0)
     
-    # Bay sizing: 2.5m x 5.0m = 12.5 m2 per bay (NBC / SP 21)
+    # Bay sizing: 2.5m x 5.5m = 13.75 m2 per bay (Bengaluru RMP-2015 Zoning Regulations, p. 48)
     stall_w = 2.5
-    stall_d = 5.0
+    stall_d = 5.5
     
     if layout_type == "herringbone_45":
         # 45-degree angle parking

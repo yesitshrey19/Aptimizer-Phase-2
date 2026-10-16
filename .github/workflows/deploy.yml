@@ -1,6 +1,6 @@
 name: Deploy frontend to GitHub Pages
 
-# Builds the React frontend under the repository path /Stage-1-APTIMIZER/ and publishes it
+# Builds the React frontend under the repository path /Aptimizer-Phase-2/ and publishes it
 # to GitHub Pages. Only the static frontend is deployed: the FastAPI backend and MongoDB
 # are not hosted by Pages. Point the site at a deployed backend by setting the repository
 # variable BACKEND_URL (Settings → Secrets and variables → Actions → Variables), e.g.
@@ -47,8 +47,8 @@ jobs:
       - name: Build for GitHub Pages
         env:
           REACT_APP_BACKEND_URL: ${{ vars.BACKEND_URL }}
-        # PUBLIC_URL=/Stage-1-APTIMIZER and a 404.html copy of index.html, so deep links such
-        # as /Stage-1-APTIMIZER/projects/<id> load the app instead of GitHub's 404 page.
+        # PUBLIC_URL=/Aptimizer-Phase-2 and a 404.html copy of index.html, so deep links such
+        # as /Aptimizer-Phase-2/projects/<id> load the app instead of GitHub's 404 page.
         run: npm run build:pages
 
       - name: Upload Pages artifact

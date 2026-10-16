@@ -178,10 +178,14 @@ class TowerConfig:
 
 @dataclass
 class SurfaceParkingConfig:
-    """Perpendicular (90-degree) surface bays flanking the drives — SP:21 dimensions."""
+    """Perpendicular (90-degree) surface bays flanking the drives.
+
+    Stall size per the Bengaluru RMP-2015 Zoning Regulations (p. 48): 2.5 m x 5.5 m.
+    The 6.0 m aisle stays the SP:21 figure for 90-degree bays.
+    """
     enabled: bool = True
     stall_width: float = 2.5
-    stall_depth: float = 5.0
+    stall_depth: float = 5.5
     kerb_offset: float = 0.3     # gap between the carriageway edge and the stall nose
 
 

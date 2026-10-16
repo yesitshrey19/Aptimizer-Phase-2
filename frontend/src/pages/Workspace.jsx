@@ -11,12 +11,23 @@ import { WORKSPACE_CATALOG } from "../lib/workspaceCatalog";
 import { CalculationNotice } from "../components/CalculationNotice";
 import { Button } from "../components/ui/button";
 
-// Stage 1 (Site) prototype: only the site modules are part of this build.
+// Stage 1 (Site) plus the stages added so far. Stage 2 (Design) brings planning, parking,
+// the generative studios, 3D and the BIM/CAD exports.
 const GisModule = lazy(() => import("../modules/GisModule"));
 const TownshipModule = lazy(() => import("../modules/TownshipModule"));
 const SiteReportsModule = lazy(() => import("../modules/SiteReportsModule"));
+const PlanningModule = lazy(() => import("../modules/PlanningModule"));
+const AutonomousStudioModule = lazy(() => import("../modules/AutonomousStudioModule"));
+const ParkingModule = lazy(() => import("../modules/ParkingModule"));
+const GenerativeStudioModule = lazy(() => import("../modules/GenerativeStudioModule"));
+const ThreeDModule = lazy(() => import("../modules/ThreeDModule"));
+const BimModule = lazy(() => import("../modules/BimModule"));
 
-const COMPONENTS = { plot: SiteModule, gis: GisModule, township: TownshipModule, reports: SiteReportsModule };
+const COMPONENTS = {
+  plot: SiteModule, gis: GisModule, township: TownshipModule, reports: SiteReportsModule,
+  planning: PlanningModule, "autonomous-studio": AutonomousStudioModule, parking: ParkingModule,
+  studio: GenerativeStudioModule, "3d": ThreeDModule, bim: BimModule,
+};
 const GROUPS = WORKSPACE_CATALOG.map(g => [g.id, g.label, g.modules.map(m => [m.id, m.name, m.icon, COMPONENTS[m.id]])]);
 
 const MODULES = GROUPS.flatMap(([, , items]) => items);

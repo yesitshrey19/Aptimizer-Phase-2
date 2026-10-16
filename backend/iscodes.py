@@ -162,18 +162,18 @@ CLAUSES = {
     # The sub-clause is named as unverified rather than guessed: this is the first citation
     # in the registry that cannot be pinned, and saying so is the point.
     "room_min_area": {"code": "NBC 2016 Part 3",
-                      "clause": "Part 3, Sec. 1 — Development Control (sub-clause not verified)",
-                      "topic": "Minimum area of habitable rooms, kitchens and toilets", "verified": False},
+                      "clause": "Cl. 12.2.2 (habitable), 12.3.2 (kitchen), 12.4.2 (bath and WC), pp. 44",
+                      "topic": "Minimum area of habitable rooms, kitchens and toilets", "verified": True},
     "room_min_width": {"code": "NBC 2016 Part 3",
-                       "clause": "Part 3, Sec. 1 — Development Control (sub-clause not verified)",
-                       "topic": "Minimum clear width of habitable rooms and kitchens", "verified": False},
+                       "clause": "Cl. 12.3.2 (kitchen), 12.4.2 (bath and WC), p. 44",
+                       "topic": "Minimum clear width of habitable rooms and kitchens", "verified": True},
     "room_min_height": {"code": "NBC 2016 Part 3",
-                        "clause": "Part 3, Sec. 1 — Development Control (sub-clause not verified)",
-                        "topic": "Minimum clear height of habitable rooms and toilets", "verified": False},
-    "room_light_vent": {"code": "NBC 2016 Part 8, Sec. 1",
-                        "clause": "Part 8, Sec. 1 — Lighting and Ventilation (sub-clause not verified)",
+                        "clause": "Cl. 12.2.1 (habitable, p. 43), 12.4.1 (bath and WC, p. 44)",
+                        "topic": "Minimum clear height of habitable rooms and toilets", "verified": True},
+    "room_light_vent": {"code": "NBC 2016 Part 3",
+                        "clause": "Cl. 20.1.2 (windows, pp. 57-58), 12.4.3(f) (toilet ventilator, p. 44)",
                         "topic": "Window area as a fraction of floor area; openable fraction; toilet vent opening",
-                        "verified": False},
+                        "verified": True},
 }
 
 # ---------------------------------------------------------------- IS 875 Part 1
@@ -443,32 +443,36 @@ ACCESS = {
 # book is not a standard and a number sourced from one would carry a clause's authority with
 # no clause behind it.
 #
-# The inclusion test, stated once so a future editor can apply it: a value enters this table
-# as a number only if this platform already asserts it as an NBC/IS figure somewhere a user
-# can see. That is true of exactly four — 9.5 (is3861 card + layout.ROOM_SCHEMA living and
-# bedroom min_area), 5.5 (same, kitchen), 1.8 (same, bathroom), 2400 (the card says "min
-# width 2.4 m"; layout.ROOM_SCHEMA bedroom min_dim). Everything else is UNREAD. The
-# comment beside each unread key records what the rule book claims, so whoever opens Part 3
-# knows which number they are there to confirm or contradict — it is a lead, not a value.
-ROOM_MINIMA_VERIFIED = False   # no controlled copy of Part 3 has been read; mirrors WIND_CF_VERIFIED
+# Phase II (16 Oct 2026): every remaining figure was read from NBC 2016 Part 3 by the
+# testing team and the clause and page recorded beside it. Two differed from the rule
+# book's lead: toilet height is 2.1 m (not 2.4 m), and the window ratio depends on the
+# climate zone. The openable fraction has no fixed value in the code, so it stays None
+# (no code minimum) rather than a number.
+ROOM_MINIMA_VERIFIED = True   # read from NBC 2016 Part 3, clauses and pages beside each value
 
 _ROOM_NBC_2016 = {
     "habitable_min_area_sqm":            9.5,      # single-room dwelling
-    "habitable_min_area_multi_sqm":      UNREAD,   # two-or-more-room dwelling (book says 7.5)
+    # Two-or-more-room dwelling, Cl. 12.2.2 p. 44: one room >= 9.5 m2, the others >= 7.5 m2.
+    # Only the 7.5 m2 floor is applied per room; the "one room >= 9.5" condition is not
+    # checked across the flat.
+    "habitable_min_area_multi_sqm":      7.5,
     "habitable_min_width_mm":            2400,
-    "habitable_min_height_mm":           UNREAD,   # book says 2750
+    "habitable_min_height_mm":           2750,     # Cl. 12.2.1, p. 43
     "kitchen_min_area_sqm":              5.5,
-    "kitchen_min_width_mm":              UNREAD,   # book says 1800
-    "kitchen_with_dining_min_area_sqm":  UNREAD,   # book says 7.5
+    "kitchen_min_width_mm":              1800,     # Cl. 12.3.2, p. 44
+    "kitchen_with_dining_min_area_sqm":  7.5,      # Cl. 12.3.2, p. 44
     "bath_min_area_sqm":                 1.8,
-    "bath_min_width_mm":                 UNREAD,   # book says 1200
-    "wc_min_area_sqm":                   UNREAD,   # book says 1.1
-    "wc_min_width_mm":                   UNREAD,   # book says 900
-    "combined_toilet_min_area_sqm":      UNREAD,   # book says 2.8
-    "toilet_min_height_mm":              UNREAD,   # book says 2400
-    "window_area_ratio":                 UNREAD,   # book says 1/10, 1/6 hot-humid (Part 8)
-    "window_openable_fraction":          UNREAD,   # book says 0.5
-    "toilet_vent_min_area_sqm":          UNREAD,   # book says 0.3
+    "bath_min_width_mm":                 1200,     # Cl. 12.4.2, p. 44
+    "wc_min_area_sqm":                   1.1,      # Cl. 12.4.2, p. 44
+    "wc_min_width_mm":                   900,      # Cl. 12.4.2, p. 44
+    "combined_toilet_min_area_sqm":      2.8,      # Cl. 12.4.2, p. 44
+    "toilet_min_height_mm":              2100,     # Cl. 12.4.1, p. 44
+    # Cl. 20.1.2, pp. 57-58: 1/10 hot-dry, 1/6 warm-humid, 1/8 temperate and composite,
+    # 1/12 cold; kitchens +25%. Bengaluru is temperate, so 1/8. A warm-humid site still
+    # gets 1/6 because the rule book's hot-humid target is the stricter figure and governs.
+    "window_area_ratio":                 1 / 8,
+    "window_openable_fraction":          None,     # Cl. 20.1.2 Note 1, p. 58: no fixed fraction
+    "toilet_vent_min_area_sqm":          0.3,      # Cl. 12.4.3(f), p. 44
 }
 
 # Every value UNREAD, for the same reason _FIRE_SP7_2026 is: SP 7:2026 has not been read.

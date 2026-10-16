@@ -71,7 +71,7 @@
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "build:pages": "PUBLIC_URL=/Stage-1-APTIMIZER craco build && cp build/index.html build/404.html"
+    "build:pages": "PUBLIC_URL=/Aptimizer-Phase-2 craco build && cp build/index.html build/404.html"
   },
   "browserslist": {
     "production": [

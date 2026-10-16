@@ -33,6 +33,13 @@ COPY . .
 RUN useradd --create-home --uid 10001 apt && chown -R apt:apt /app
 USER apt
 
+# Build matplotlib's font cache into the image (in the apt user's home). Otherwise the
+# first floor-plan render after every start builds it, which on a 0.1-CPU free instance
+# holds that request for a minute or more -- and a free instance starts fresh after each
+# spin-down.
+ENV MPLBACKEND=Agg
+RUN python -c "import matplotlib.font_manager"
+
 # Host platforms assign the port (Render sets PORT=10000 and forwards traffic there);
 # 8000 is the local and docker-compose default. WEB_CONCURRENCY is 2 here to keep the
 # previous behaviour, and is set to 1 on Render's 512 MB free instance -- the imports

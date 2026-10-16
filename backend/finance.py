@@ -42,7 +42,11 @@ class FinanceConfig:
     land_cost: float = 0.0
     approval_cost: float = 0.0          # sanction fees, betterment charges, consultants
     marketing_pct: float = 3.0          # of gross revenue
-    contingency_pct: float = 5.0        # of construction cost
+    # EXTRA, developer-level contingency only, % of construction cost. The construction
+    # contingency is already inside the BOQ grand total (engine.DEFAULT_COST_ADDERS, before
+    # escalation and GST), and construction cost here IS that total, so a 5% default here
+    # counted it twice -- on top of tax and escalation (Phase II fix 2).
+    contingency_pct: float = 0.0
     # Money
     debt_ratio: float = 60.0            # share of project cost funded by borrowing
     interest_rate_pct: float = 11.0     # annual, on the drawn balance

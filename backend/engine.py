@@ -604,7 +604,11 @@ def compliance(project, areas, park):
     for r in rules:
         if not r.get("enabled", True):
             continue
-        actual = float(params.get(r["param"], 0))
+        # Rounded to 6 decimals before comparing: a scheme designed exactly at a limit
+        # computes as e.g. FAR 3.0000000000000004 and was failed as "3.0 violates maximum
+        # 3.0" -- about one at-limit design in seven. Six places removes the float noise and
+        # still catches any real excess (Phase II Stage 2 finding).
+        actual = round(float(params.get(r["param"], 0)), 6)
         threshold = float(r.get("threshold") or 0)
         ok = actual <= threshold if r.get("operator") == "max" else actual >= threshold
         results.append({

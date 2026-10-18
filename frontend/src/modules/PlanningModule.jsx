@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { Plus, RefreshCw, Sparkles, Trash2, Building2, Compass, ShieldCheck, CheckCircle2, LayoutGrid, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Edit3, X, Move } from "lucide-react";
+import { Plus, RefreshCw, Sparkles, Trash2, Building2, Compass, ShieldCheck, CheckCircle2, AlertTriangle, XCircle, LayoutGrid, ZoomIn, ZoomOut, RotateCcw, Maximize2, Minimize2, Edit3, X, Move } from "lucide-react";
 import { api, apiError, syncTowersFromLayout, API_BASE } from "../lib/api";
 import { Metric, NumField, Section, TextField } from "../components/Field";
 import OptimiserPanel from "../components/OptimiserPanel";
@@ -1190,30 +1190,39 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
                   )}
 
                   <div className="space-y-1 text-[11px] text-slate-600">
-                    <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                      <span className="font-mono text-slate-500">Ishanya (NE)</span>
-                      <span className="font-medium text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Pooja Room / Niche
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                      <span className="font-mono text-slate-500">Agni (SE)</span>
-                      <span className="font-medium text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Kitchen & East Hob
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-0.5 border-b border-slate-100">
-                      <span className="font-mono text-slate-500">Nairutya (SW)</span>
-                      <span className="font-medium text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Master Suite
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between py-0.5">
-                      <span className="font-mono text-slate-500">MEP Shafts</span>
-                      <span className="font-medium text-emerald-700 flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" /> Stack Grouping
-                      </span>
-                    </div>
+                    {(() => {
+                      // Each row reports what the audit found on this floor, flat by flat;
+                      // a tick only when every flat that has the room meets its sector.
+                      const audits = Object.values(vastu.unit_audits || {});
+                      const tally = (key) => {
+                        const placed = audits.filter((a) => a.anchors?.[key]?.placed);
+                        return { met: placed.filter((a) => a.anchors[key].met).length, placed: placed.length };
+                      };
+                      const unitIds = [...new Set(floorRooms.map((r) => r.unit_id).filter(Boolean))];
+                      const withShaft = unitIds.filter((u) => floorRooms.some((r) => r.unit_id === u && r.type === "shaft"));
+                      const rows = [
+                        { zone: "Ishanya (NE)", label: "Pooja Room / Niche", ...tally("pooja") },
+                        { zone: "Agni (SE)", label: "Kitchen", ...tally("kitchen") },
+                        { zone: "Nairutya (SW)", label: "Master Bedroom", ...tally("master") },
+                        { zone: "MEP Shafts", label: "Shaft in flat", met: withShaft.length, placed: unitIds.length },
+                      ];
+                      return rows.map((row, i) => {
+                        const all = row.placed > 0 && row.met === row.placed;
+                        const none = row.placed > 0 && row.met === 0;
+                        const Icon = all ? CheckCircle2 : none ? XCircle : AlertTriangle;
+                        const tone = row.placed === 0 ? "text-slate-400" : all ? "text-emerald-700" : none ? "text-red-700" : "text-amber-700";
+                        return (
+                          <div key={row.zone} className={`flex items-center justify-between py-0.5 ${i < rows.length - 1 ? "border-b border-slate-100" : ""}`}
+                            data-testid={`vastu-row-${i}`}>
+                            <span className="font-mono text-slate-500">{row.zone}</span>
+                            <span className={`font-medium flex items-center gap-1 ${tone}`}>
+                              {row.placed > 0 && <Icon className="h-3 w-3" />}
+                              {row.label} · {row.placed === 0 ? "not in these flats" : `${row.met} of ${row.placed} flat${row.placed === 1 ? "" : "s"}`}
+                            </span>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 </div>
               );

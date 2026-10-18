@@ -181,7 +181,7 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
         unit_type = info.get("unit_type") or (urooms[0].get("unit_type") if urooms else "2bhk")
         program_violations = _room_program_violations(urooms, unit_type)
         hard["violations"].extend(program_violations)
-        sectors = vastu.sector_report(urooms, box)
+        sectors = vastu.sector_report(urooms, box, vastu.true_side(entry, box.get("rot_deg") or 0.0))
         mandala = audit_room_zones(urooms, box)
         for key, rep in sectors.items():
             if rep.get("placed"):
@@ -262,6 +262,41 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
         "rotation_deg": rotation_deg,
         "unit_audits": unit_audits,
     }
+
+
+NICHE_W, NICHE_D = 0.6, 0.45     # a pooja cabinet: width along the wall, depth into the room
+_GRADE_RANK = {"ideal": 0, "acceptable": 1, "missed": 2, "forbidden": 3}
+
+
+def _add_pooja_niche(rooms: List[Dict[str, Any]], box: Dict[str, Any], facing: str) -> None:
+    """Give a flat with no pooja room the manual's "Niche/Cabinet in Living/Dining": a
+    0.6 m cabinet in whichever corner of the living room grades best for the pooja (NE,
+    else East/North, never South/South-West) and does not touch a bathroom ("Fatal
+    Error: Sharing any wall with a bathroom"). Stored on the living room, not as a room,
+    so it takes no carpet area."""
+    if any(r.get("type") == "pooja" for r in rooms):
+        return
+    living = next((r for r in rooms if r.get("type") == "living" and str(r.get("id", "")).endswith("-living")),
+                  next((r for r in rooms if r.get("type") == "living"), None))
+    if living is None or living["w"] < NICHE_W or living["h"] < NICHE_W:
+        return
+    baths = [r for r in rooms if room_zone_kind(r) == "bathroom"]
+    x0, y0, x1, y1 = living["x"], living["y"], living["x"] + living["w"], living["y"] + living["h"]
+    best = None
+    for cx, cy in ((x0, y0), (x1 - NICHE_W, y0), (x0, y1 - NICHE_D), (x1 - NICHE_W, y1 - NICHE_D)):
+        niche = {"x": round(cx, 2), "y": round(cy, 2), "w": NICHE_W, "h": NICHE_D}
+        if any(vastu.touches(niche, b) or vastu.overlaps(niche, b) for b in baths):
+            continue
+        probe = {**living, "pooja_niche": niche}
+        grade = vastu.sector_report([probe], box, facing)["pooja"]["grade"]
+        if best is None or _GRADE_RANK[grade] < _GRADE_RANK[best[0]]:
+            best = (grade, niche)
+    if best is None:
+        return
+    living["pooja_niche"] = best[1]
+    if "Pooja" not in str(living.get("name")):
+        living["name"] = f"{living['name']} + Pooja Niche"
+    living["omitted_for_space"] = [x for x in (living.get("omitted_for_space") or []) if x != "pooja"]
 
 
 _EDGE_VECTORS = {"N": (0.0, 1.0), "S": (0.0, -1.0), "E": (1.0, 0.0), "W": (-1.0, 0.0)}
@@ -379,7 +414,8 @@ def _room_program_violations(rooms: List[Dict[str, Any]], unit_type: str) -> Lis
         issues.append(f"{unit_type} needs at least {minimum_baths} bathrooms; found {bath_count}")
     # The realistic planner leaves the pooja out of a flat too small for it, and says so.
     dropped = {item for room in rooms for item in (room.get("omitted_for_space") or [])}
-    if "pooja" not in kinds and "pooja" not in dropped:
+    has_niche = any(room.get("pooja_niche") for room in rooms)
+    if "pooja" not in kinds and "pooja" not in dropped and not has_niche:
         issues.append(f"required pooja room/niche is missing for {unit_type}")
     if "utility" not in kinds:
         issues.append(f"required kitchen utility is missing for {unit_type}")
@@ -570,10 +606,12 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
                     if not candidate:
                         continue
                     _apply_guide_metadata(candidate, box, entry_edge)
+                    facing = vastu.true_side(entry_edge, rotation)
+                    _add_pooja_niche(candidate, box, facing)
                     hard = vastu.check_unit(candidate, box, exterior, entry_edge)
                     program_violations = _room_program_violations(candidate, u["type"])
                     zones = audit_room_zones(candidate, box)
-                    anchors = vastu.sector_report(candidate, box)
+                    anchors = vastu.sector_report(candidate, box, facing)
                     anchor_misses = sum(
                         1 for report in anchors.values()
                         if report.get("placed") and not report.get("met")

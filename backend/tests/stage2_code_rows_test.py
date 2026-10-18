@@ -490,11 +490,13 @@ def test_too_small_carpet_is_drawn_at_the_nbc_minimum_with_a_warning():
 
 
 # ------------------------------------------ Vastu: rule cases behave as written (S2-087)
-# The app's audit places each anchor room (pooja, kitchen, master bedroom) in one cell of
-# a 3x3 grid over its flat, north at the top, and marks it met when that cell is the
-# target (pooja NE, kitchen SE, master SW). Checked here against an independent 3x3
+# The app's audit places each anchor room (pooja, kitchen, master bedroom) in a 3x3 cell
+# and a quadrant of its flat, north at the top, and marks it met when the quadrant is the
+# manual's target (pooja NE, kitchen SE or NW for a South-facing flat, master SW). Checked here against an independent 3x3
 # placement of the same rooms, over 1-5 BHK flats on low and top floors; the MEP-shaft
 # claim ("stack grouping") is checked as shafts sitting in the same place floor to floor.
+import vastu
+
 VASTU_TARGETS = {"pooja": "NE", "kitchen": "SE", "master": "SW"}
 VASTU_SWEEP = {"1bhk": (50, 60), "2bhk": (70, 90), "3bhk": (100, 130), "4bhk": (150, 200), "5bhk": (200, 260)}
 
@@ -505,6 +507,12 @@ def _grid_cell(room, box):
     col = min(2, int((cx - x0) / w * 3))
     row = min(2, int((cy - y0) / h * 3))
     return (("NW", "N", "NE"), ("W", "CENTER", "E"), ("SW", "S", "SE"))[row][col]
+
+
+def _quadrant(room, box):
+    x0, y0, w, h = box
+    cx, cy = room["x"] + room["w"] / 2, room["y"] + room["h"] / 2
+    return ("N" if cy <= y0 + h / 2 else "S") + ("E" if cx >= x0 + w / 2 else "W")
 
 
 def vastu_rule_cases():
@@ -524,7 +532,7 @@ def vastu_rule_cases():
                     rs = [r for r in rooms if r.get("unit_id") == uid]
                     x0, y0 = min(r["x"] for r in rs), min(r["y"] for r in rs)
                     box = (x0, y0, max(r["x"] + r["w"] for r in rs) - x0, max(r["y"] + r["h"] for r in rs) - y0)
-                    picks = {"pooja": next((r for r in rs if r["type"] == "pooja"), None),
+                    picks = {"pooja": vastu.pooja_of(rs),
                              "kitchen": next((r for r in rs if r["type"] == "kitchen"), None),
                              "master": next((r for r in rs if r["id"].endswith("-mbed")), None)}
                     for key, room in picks.items():
@@ -532,12 +540,13 @@ def vastu_rule_cases():
                         if room is None:
                             continue
                         placed[key] += 1
-                        cell = _grid_cell(room, box)
-                        mine = cell == VASTU_TARGETS[key]
+                        cell, quarter = _grid_cell(room, box), _quadrant(room, box)
+                        mine = quarter in report["target"]        # the manual's quadrant targets
                         met[key] += mine
-                        if report["sector"] != cell or bool(report["met"]) != mine:
+                        if report["sector"] != cell or report["quadrant"] != quarter or bool(report["met"]) != mine:
                             disagreements.append(f"{unit_type} {carpet} m2 floor {floor} {uid} {key}: "
-                                                 f"audit {report['sector']}/{report['met']}, grid {cell}/{mine}")
+                                                 f"audit {report['sector']}/{report['quadrant']}/{report['met']}, "
+                                                 f"mine {cell}/{quarter}/{mine}")
             # Shafts on the typical floors (2 and 3) should stack.
             floors_compared += 1
             shaft_moves += shafts_by_floor[2] != shafts_by_floor[3]

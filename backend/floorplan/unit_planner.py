@@ -54,6 +54,7 @@ SECONDARY_BALCONY = 1.2     # guide: 1.2-1.5 m
 UTILITY_W = 1.35            # guide: 1.2-1.5 m
 UTILITY_MIN_D = 2.4
 SHAFT_W = 0.9
+STORE_SHAFT_D = 1.0         # a shaft cut from the back of the kitchen store (uw x 1.0 m)
 POWDER_W = 1.8
 POOJA_W = {1: 1.1, 2: 1.4, 3: 1.5, 4: 1.6, 5: 1.8}
 BATH_SLOT_W = 2.1           # en-suite / common bath width behind a bedroom
@@ -301,6 +302,14 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     # the bedroom's service strip, between the bath and the lobby.
     split = max(0, min(int(split), len(order)))
     bed_shaft = two_row and beds == 1 and split == 1
+    # If that bedroom is too narrow to carry the shaft beside its bath, the shaft takes the
+    # back of the kitchen store instead, still on the kitchen's wet wall.
+    shaft_in_store = False
+    if bed_shaft:
+        bw0 = cols["beds"][order[0]]
+        slot0 = min(BATH_SLOT_W, bw0 - MIN_LOBBY_W)
+        narrow = slot0 - SHAFT_W
+        shaft_in_store = narrow < MIN_BATH_W or narrow * cols["d2"] < MIN_BATH_AREA - 1e-6
     seq: List[Tuple[str, Any]] = []
     if servant and servant_first:
         seq.append(("servant", None))
@@ -348,10 +357,16 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     # far side from the living room; it moves the kitchen a column along the facade.
     ux, kx = (x_util + kw, x_util) if kitchen_first else (x_util, x_util + uw)
     emit("utility", "Utility / Dry Balcony", "utility", ux, 0, uw, ud, door_to="kitchen", has_window=True)
+    store_d = d1 - ud
+    if shaft_in_store:
+        store_d = round(d1 - ud - STORE_SHAFT_D, 3)
+        if store_d < 0.6:
+            return [], ["The kitchen store is too shallow to give up its back to the shaft."]
+        emit("shaft", "MEP Shaft", "shaft", ux, ud + store_d, uw, STORE_SHAFT_D, has_window=False)
     if big:
-        emit("pantry", "Pantry & Dry Store", "pantry", ux, ud, uw, d1 - ud, door_to="kitchen")
+        emit("pantry", "Pantry & Dry Store", "pantry", ux, ud, uw, store_d, door_to="kitchen")
     else:
-        emit("store", "Kitchen Store", "storage", ux, ud, uw, d1 - ud, door_to="kitchen")
+        emit("store", "Kitchen Store", "storage", ux, ud, uw, store_d, door_to="kitchen")
     emit("kitchen", "Kitchen", "kitchen", kx, 0, kw, d1, has_window=True,
          door_to="foyer" if two_row else "breakfast",
          hob_faces="East")
@@ -475,7 +490,7 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         # touches, so no bath ever shares a wall with the pooja room. Without the passage
         # row, a bedroom before the core turns its lobby to the core side instead.
         pre_core = two_row and bx < x_util
-        if pre_core and bed_shaft:
+        if pre_core and bed_shaft and not shaft_in_store:
             slot = round(bw - lobby_w - SHAFT_W, 3)
             if slot < MIN_BATH_W or slot * d2 < MIN_BATH_AREA - 1e-6:
                 return [], ["The bedroom is too narrow to carry the shaft beside its bath."]

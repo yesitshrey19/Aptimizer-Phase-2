@@ -807,37 +807,76 @@ def check_unit(rooms: Sequence[dict], box: dict, exterior_edges: Sequence[str],
     return {"violations": v, "coverage_pct": round(coverage * 100, 1), "ok": not v}
 
 
-def sector_report(rooms: Sequence[dict], box: dict) -> Dict[str, Any]:
-    """Which anchors landed in their 3x3 Mandala zone, stated as found."""
+def true_side(edge: str, rotation_deg: float = 0.0) -> str:
+    """The true compass side (N/E/S/W) a plan edge faces once the building is turned
+    `rotation_deg` anticlockwise on site."""
+    u, v = {"N": (0.0, 1.0), "S": (0.0, -1.0), "E": (1.0, 0.0), "W": (-1.0, 0.0)}.get(edge, (0.0, -1.0))
+    rot = math.radians(rotation_deg or 0.0)
+    u, v = u * math.cos(rot) - v * math.sin(rot), u * math.sin(rot) + v * math.cos(rot)
+    if abs(v) >= abs(u):
+        return "N" if v > 0 else "S"
+    return "E" if u > 0 else "W"
+
+
+def anchor_rules(key: str, facing: Optional[str] = None) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+    """(ideal quadrants, fallback sectors/quadrants) for an anchor, per the manuals.
+
+    The Aptimizer manual places the anchors by quadrant (pooja NE, kitchen SE, master SW)
+    with fallbacks (pooja "East or North", kitchen "North-West"); its entrance table routes
+    the kitchen of a South-facing flat to NW "to avoid entrance conflict", so there NW is
+    the target and SE the fallback."""
+    if key == "kitchen" and facing == "S":
+        return ("NW",), ("SE",)
+    return ANCHOR_SECTORS.get(key, ()), ANCHOR_ACCEPTABLE.get(key, ())
+
+
+def pooja_of(rooms: Sequence[dict]) -> Optional[dict]:
+    """The pooja room, or the niche a compact flat keeps in its living room (manual: "Pooja:
+    Niche/Cabinet in Living/Dining") as a small rectangle of its own."""
+    room = next((r for r in rooms if r["type"] == "pooja"), None)
+    if room is not None:
+        return room
+    living = next((r for r in rooms if r.get("pooja_niche")), None)
+    if living is None:
+        return None
+    return {**living["pooja_niche"], "id": f"{living['id']}-niche", "type": "pooja", "name": "Pooja Niche"}
+
+
+def sector_report(rooms: Sequence[dict], box: dict, facing: Optional[str] = None) -> Dict[str, Any]:
+    """Each anchor's place, graded against the manuals, stated as found.
+
+    `sector` is the room's 3x3 Mandala cell and `quadrant` its quarter of the flat, both in
+    true compass directions. Ideal = the target quadrant (the Aptimizer manual's wording);
+    fallback = the manual's named alternative; forbidden = a "never" sector in either
+    reading; anything else is missed. `facing` is the true side of the flat's entrance."""
     out = {}
     picks = {
-        "pooja": next((r for r in rooms if r["type"] == "pooja"), None),
+        "pooja": pooja_of(rooms),
         "kitchen": next((r for r in rooms if r["type"] == "kitchen"), None),
         "master": next((r for r in rooms if r["id"].endswith("-mbed")), None),
     }
     for key, room in picks.items():
+        targets, acceptable = anchor_rules(key, facing)
         if room is None:
-            out[key] = {"placed": False, "sector": None, "target": ANCHOR_SECTORS.get(key, ()),
+            out[key] = {"placed": False, "sector": None, "target": targets,
                         "met": None, "detail": "not present in this unit's programme"}
             continue
         sec = mandala_zone_of(room, box)
         quadrant = sector_of(room, box)
-        targets = ANCHOR_SECTORS.get(key, ())
-        acceptable = ANCHOR_ACCEPTABLE.get(key, ())
         forbidden = ANCHOR_FORBIDDEN.get(key, ())
-        met = sec in targets
+        met = quadrant in targets
         forbidden_hit = sec in forbidden or quadrant in ANCHOR_FORBIDDEN_QUADRANTS.get(key, ())
         grade = ("forbidden" if forbidden_hit else "ideal" if met
-                 else "acceptable" if sec in acceptable else "missed")
+                 else "acceptable" if (sec in acceptable or quadrant in acceptable) else "missed")
+        where = f"{quadrant} quadrant ({sec} sector)"
         out[key] = {
             "placed": True, "sector": sec, "mandala_zone": sec, "quadrant": quadrant,
             "target": targets, "acceptable": acceptable, "met": met, "grade": grade,
-            "forbidden_hit": forbidden_hit,
-            "detail": (f"in {sec}, its primary sector" if met
-                       else f"in {sec}, the manual's fallback (target {'/'.join(targets)})" if grade == "acceptable"
-                       else (f"in {sec} ({quadrant} quadrant), which the manual forbids (target {'/'.join(targets)})")
-                       if grade == "forbidden"
-                       else f"in {sec} — the target is {'/'.join(targets)}"),
+            "forbidden_hit": forbidden_hit, "niche": room.get("type") == "pooja" and room["id"].endswith("-niche"),
+            "detail": (f"in the {where}, its target" if met
+                       else f"in the {where}, the manual's fallback (target {'/'.join(targets)})" if grade == "acceptable"
+                       else f"in the {where}, which the manual forbids (target {'/'.join(targets)})" if grade == "forbidden"
+                       else f"in the {where} — the target is {'/'.join(targets)}"),
         }
     return out
 

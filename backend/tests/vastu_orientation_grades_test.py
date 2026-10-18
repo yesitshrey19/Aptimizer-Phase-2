@@ -1,11 +1,12 @@
 """Vastu in true compass directions, graded the way the manuals word the anchors.
 
 * A tower turned on site turns every sector with it (design_guide.compass_offset).
-* Anchors are graded ideal / acceptable (the manual's fallback) / missed / forbidden;
-  "never" sectors count in either reading the manuals use (3x3 sector or quadrant).
-* The planner avoids forbidden placements: across 1-5 BHK flats on both sides of the
-  corridor the only ones left are compact north-row 1 BHKs, whose bedroom is too narrow
-  to carry the shaft that moving it west requires.
+* Anchors are graded ideal (target quadrant, the Aptimizer manual's wording) / acceptable
+  (the manual's fallback) / missed / forbidden; "never" sectors count in either reading
+  the manuals use (3x3 sector or quadrant). A South-facing flat's kitchen targets NW.
+* Every flat has a pooja: a room, or the manual's niche in the living room.
+* The planner keeps every anchor out of forbidden sectors, on both sides of the corridor
+  and with the building turned on site.
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,19 +51,28 @@ def test_site_rotation_reaches_the_tower():
     assert tower["plan_rotation_deg"] == 120      # the long (corridor) axis runs along depth
 
 
-@pytest.mark.parametrize("key,cell,grade", [
-    ("pooja", (8.0, 1.0), "ideal"),          # NE
-    ("pooja", (8.0, 4.5), "acceptable"),     # E: "default to East or North"
-    ("pooja", (4.5, 8.0), "forbidden"),      # S: "never ... the South"
-    ("kitchen", (8.0, 8.0), "ideal"),        # SE
-    ("kitchen", (1.0, 1.0), "acceptable"),   # NW: "secondary valid node"
-    ("master", (1.0, 8.0), "ideal"),         # SW
-    ("master", (7.0, 3.5), "forbidden"),     # E by sector, but in the NE quadrant: "never NE"
+@pytest.mark.parametrize("key,cell,facing,grade", [
+    ("pooja", (8.0, 1.0), None, "ideal"),          # NE quadrant
+    ("pooja", (4.0, 1.0), None, "acceptable"),     # N sector: "default to East or North"
+    ("pooja", (4.5, 8.0), None, "forbidden"),      # S: "never ... the South"
+    ("kitchen", (8.0, 8.0), None, "ideal"),        # SE
+    ("kitchen", (1.0, 1.0), None, "acceptable"),   # NW: "secondary valid node"
+    ("kitchen", (1.0, 1.0), "S", "ideal"),         # South facing: "Kitchen must route to NW"
+    ("kitchen", (8.0, 8.0), "S", "acceptable"),
+    ("master", (1.0, 8.0), None, "ideal"),         # SW
+    ("master", (2.0, 5.5), None, "ideal"),         # W sector, SW quadrant
+    ("master", (7.0, 3.5), None, "forbidden"),     # E by sector, but in the NE quadrant: "never NE"
 ])
-def test_anchor_grades_follow_the_manual(key, cell, grade):
+def test_anchor_grades_follow_the_manual(key, cell, facing, grade):
     room = _room(*cell)
     room["id"], room["type"] = ("u-mbed", "bedroom") if key == "master" else (f"u-{key}", key)
-    assert vastu.sector_report([room], BOX)[key]["grade"] == grade
+    assert vastu.sector_report([room], BOX, facing)[key]["grade"] == grade
+
+
+def test_living_room_niche_counts_as_the_pooja():
+    living = {"id": "u-living", "type": "living", "x": 0.0, "y": 0.0, "w": 9.0, "h": 4.0,
+              "pooja_niche": {"x": 8.4, "y": 0.0, "w": 0.6, "h": 0.45}}
+    assert vastu.sector_report([living], BOX)["pooja"]["grade"] == "ideal"
 
 
 def _forbidden(mix, rotation=0.0):
@@ -76,8 +86,9 @@ def _forbidden(mix, rotation=0.0):
     return out
 
 
-@pytest.mark.parametrize("rotation", [0.0, 180.0])
+@pytest.mark.parametrize("rotation", [0.0, 90.0, 180.0])
 @pytest.mark.parametrize("mix", [
+    [("1bhk", 4, 45), ("2bhk", 1, 65), ("3bhk", 1, 95)],
     [("1bhk", 4, 65), ("2bhk", 2, 80)],
     [("2bhk", 2, 75), ("3bhk", 2, 110)],
     [("3bhk", 4, 120)],
@@ -88,6 +99,8 @@ def test_planner_keeps_anchor_rooms_out_of_forbidden_sectors(mix, rotation):
     assert _forbidden(mix, rotation) == []
 
 
-def test_compact_north_row_1bhk_is_the_one_known_exception():
-    left = _forbidden([("1bhk", 4, 45)])
-    assert left and all(t.startswith("1bhk") and k == "master" for _, t, k in left)
+def test_every_flat_has_a_pooja():
+    tower = {"id": "t", "floors": 12, "corridor_width": 1.8,
+             "units": [{"type": "1bhk", "count": 4, "carpet_area": 45}, {"type": "2bhk", "count": 2, "carpet_area": 65}]}
+    rooms, validation = aifloorplan.generate_architectural_template(tower, 3)
+    assert all(a["anchors"]["pooja"]["placed"] for a in validation["vastu"]["unit_audits"].values())

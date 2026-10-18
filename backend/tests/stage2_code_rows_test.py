@@ -454,3 +454,36 @@ def test_app_plan_rooms_have_outside_window_and_are_reachable(n):
     checked, defects = app_plan_defects(n)
     assert checked["window_rooms"] > 0
     assert defects == []
+
+
+# --------------------------------------------- drawn carpet area = entered carpet area
+# The plan's carpet (RERA: every room but balconies, terraces, the dry balcony and the
+# shaft) must come within 2% of the carpet area typed in, or the floor must say why not.
+from floorplan import unit_planner
+
+
+@pytest.mark.parametrize("unit_type,carpets", [
+    ("1bhk", (50, 55, 60, 75, 90)), ("2bhk", (70, 85, 100, 140)), ("3bhk", (100, 120, 160, 200)),
+    ("4bhk", (150, 200, 280)), ("5bhk", (200, 250, 360)),
+])
+def test_drawn_carpet_matches_entered_carpet(unit_type, carpets):
+    for carpet in carpets:
+        tower = {"id": "carpet", "floors": 4, "corridor_width": 2.0,
+                 "units": [{"type": unit_type, "count": 2, "carpet_area": carpet}]}
+        rooms, validation = aifloorplan.generate_architectural_template(tower, 2)
+        assert validation["size_warnings"] == []
+        for uid in {r["unit_id"] for r in rooms if r.get("unit_id")}:
+            drawn = unit_planner.plan_carpet([r for r in rooms if r.get("unit_id") == uid])
+            assert drawn == pytest.approx(carpet, rel=0.02), (unit_type, carpet, drawn)
+
+
+def test_too_small_carpet_is_drawn_at_the_nbc_minimum_with_a_warning():
+    tower = {"id": "small", "floors": 4, "corridor_width": 2.0,
+             "units": [{"type": "1bhk", "count": 2, "carpet_area": 30}]}
+    rooms, validation = aifloorplan.generate_architectural_template(tower, 2)
+    assert len(validation["size_warnings"]) == 1
+    assert "below the smallest 1 BHK plan" in validation["size_warnings"][0]
+    defects = []
+    for r in rooms:
+        defects += _nbc_defects(r)
+    assert defects == []

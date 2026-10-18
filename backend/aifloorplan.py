@@ -356,7 +356,9 @@ def _room_program_violations(rooms: List[Dict[str, Any]], unit_type: str) -> Lis
     bath_count = kinds.count("bathroom")
     if bath_count < minimum_baths:
         issues.append(f"{unit_type} needs at least {minimum_baths} bathrooms; found {bath_count}")
-    if "pooja" not in kinds:
+    # The realistic planner leaves the pooja out of a flat too small for it, and says so.
+    dropped = {item for room in rooms for item in (room.get("omitted_for_space") or [])}
+    if "pooja" not in kinds and "pooja" not in dropped:
         issues.append(f"required pooja room/niche is missing for {unit_type}")
     if "utility" not in kinds:
         issues.append(f"required kitchen utility is missing for {unit_type}")
@@ -600,6 +602,9 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
 
     validation = {"vastu": audit_vastu_and_mep(rooms, floor, total_floors,
                                                boxes=unit_boxes, meta=unit_meta)}
+    # Flats whose entered carpet area no plan with NBC-sized rooms can match.
+    warnings = {unit_planner.sizing(u["type"], u["carpet"])[2] for u in expanded_units}
+    validation["size_warnings"] = sorted(w for w in warnings if w)
     return rooms, validation
 
 

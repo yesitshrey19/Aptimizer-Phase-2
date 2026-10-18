@@ -1215,6 +1215,15 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
               );
             })()}
 
+            {Array.isArray(floorValidation?.size_warnings) && floorValidation.size_warnings.length > 0 && (
+              <div className="border border-amber-300 bg-amber-50 rounded-sm p-3" data-testid="floor-size-warnings">
+                <div className="text-[11px] uppercase tracking-wide font-semibold text-amber-800 mb-1">Flat size</div>
+                <ul className="space-y-1 text-xs text-amber-900">
+                  {floorValidation.size_warnings.map((w) => <li key={w}>{w}</li>)}
+                </ul>
+              </div>
+            )}
+
             <div className="border border-slate-200 rounded-sm p-3" data-testid="floor-validation-summary">
               <div className="text-[11px] uppercase tracking-wide text-slate-500">Layout validation</div>
               {(() => {

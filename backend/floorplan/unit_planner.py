@@ -31,6 +31,7 @@ Each choice answers a rule of the planning guide rather than a habit:
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import Any, Dict, List, Sequence, Tuple
 
 import vastu
@@ -57,12 +58,41 @@ POWDER_W = 1.8
 POOJA_W = {1: 1.1, 2: 1.4, 3: 1.5, 4: 1.6, 5: 1.8}
 BATH_SLOT_W = 2.1           # en-suite / common bath width behind a bedroom
 DOOR_W = 0.9                # clear width a door onto the passage needs
+BATH_DOOR_W = 0.75
 MIN_LOBBY_W = 1.05          # a bedroom door needs a lobby at least a door-and-frame wide
 SERVANT_LOBBY_W = 1.2
+# With a passage row, the column that ends the flat loses SHAFT_W of passage to the shaft;
+# a bedroom there needs its lobby plus a bath door's width of passage left over.
+END_BED_W = MIN_LOBBY_W + BATH_DOOR_W + SHAFT_W
 MAX_STORE_RATIO = 3.1       # a store deeper than this x its width reads as a strip
 
-GROSS_PER_CARPET = 1.22     # envelope (incl. walls, circulation, balconies) per m² carpet
-SCALE_LIMITS = (0.85, 1.35)
+SCALE_LIMITS = (0.5, 1.6)   # brief scale range; the floors below stop rooms going under code
+
+# Floors a room may shrink to: NBC 2016 Part 3 (Cl. 12.2.2 habitable 9.5 / 7.5 m2 and 2.4 m,
+# Cl. 12.4.2 bath + WC 2.8 m2 and 1.2 m) and the livability limits below (kitchen 2.2 m,
+# dining 2.4 m deep).
+MIN_HAB_W = 2.4
+MIN_KITCHEN_W = 2.2
+MIN_LIVING_AREA = 9.5
+MIN_BED_AREA = 7.5
+MIN_BATH_AREA = 2.8
+MIN_BATH_W = 1.2
+MIN_LIVING_D = 3.0          # living room depth behind its balcony
+MIN_DINING_W = 2.4
+MIN_SERVICE_D = 2.4         # R2 holds the dining, which livability wants 2.4 m deep
+MIN_TWO_ROW_D = 2.0         # R2 without a dining room: lobbies and 1.4 x 2.0 m baths
+MIN_ENTRY_D = 1.0           # R3: foyer and a 1.0 m private passage
+
+# Ways to save space once every room is at its floor, tried in order: 0 the full brief;
+# 1 no pooja niche; 2 (1-2 BHK only) the breakfast area becomes the entrance foyer and the
+# separate passage row goes, bedroom lobbies opening off the foyer and dining instead.
+FULL, NO_POOJA, TWO_ROW = 0, 1, 2
+LEVEL_NOTES = {
+    NO_POOJA: "No pooja niche: the carpet area is too small for one.",
+    TWO_ROW: "No pooja niche, breakfast area or separate passage, and living and dining are one "
+             "room: the main door opens into the foyer, bedroom lobbies open off the foyer and living.",
+}
+NOT_CARPET = {"balcony", "terrace", "utility", "shaft"}   # RERA carpet excludes these
 
 
 def _tier(unit_type: str, carpet: float) -> Tuple[int, bool, Dict[str, Any]]:
@@ -71,45 +101,115 @@ def _tier(unit_type: str, carpet: float) -> Tuple[int, bool, Dict[str, Any]]:
     return beds, bool(prog["is_penthouse"]), prog
 
 
-def _layout_widths(beds: int, penthouse: bool, f: float) -> Dict[str, Any]:
+def _ceil2(v: float) -> float:
+    return math.ceil(v * 100 - 1e-6) / 100
+
+
+def _layout_widths(beds: int, penthouse: bool, f: float, level: int = FULL,
+                   d1: float = 5.4, d2: float = 2.4) -> Dict[str, Any]:
     big = beds >= 5 or penthouse
     tier = min(beds, 5)
     servant = bool(vastu.SCALING_PROTOCOL[tier].get("servant"))
+    pooja = POOJA_W[tier] if level == FULL else 0.0
+    # Every bedroom column also carries a lobby and a bath (or wardrobe) behind the room.
+    bath_w = max(MIN_BATH_W, _ceil2(MIN_BATH_AREA / d2))
+
+    def bed_w(base: float, balcony: float) -> float:
+        return max(round(base * f, 2), MIN_HAB_W, _ceil2(MIN_BED_AREA / (d1 - balcony)),
+                   round(MIN_LOBBY_W + bath_w, 2))
+    bed_widths = [bed_w(MASTER_W[tier], MASTER_BALCONY) if i == 0 else bed_w(BED_W[tier], SECONDARY_BALCONY)
+                  for i in range(beds)]
     return {
         "utility": UTILITY_W,
-        "kitchen": max(round(KITCHEN_W[tier] * f, 2), 2.4),
-        # Wide enough for the pooja room and a 2.6 m dining area behind it.
-        "living": max(round(LIVING_W[tier] * f, 2), POOJA_W[tier] + 2.6),
-        "family": round(FAMILY_W * f, 2) if big else 0.0,
-        "office": round(OFFICE_W * f, 2) if big else 0.0,
-        "beds": [round((MASTER_W[tier] if i == 0 else BED_W[tier]) * f, 2) for i in range(beds)],
+        "kitchen": max(round(KITCHEN_W[tier] * f, 2), MIN_KITCHEN_W),
+        # Wide enough for the pooja room (if any) and a dining area behind it, and for the
+        # NBC 9.5 m2 room in front.
+        "living": max(round(LIVING_W[tier] * f, 2), pooja + (2.6 if pooja else MIN_DINING_W),
+                      _ceil2(MIN_LIVING_AREA / (d1 - LIVING_BALCONY)), MIN_HAB_W),
+        # The lounge runs through R1 and R2, so it must stay room-shaped (ratio <= 2.3); the
+        # office keeps a 1.0 m store beside its powder room, which may not touch the lounge.
+        "family": max(round(FAMILY_W * f, 2), MIN_HAB_W, _ceil2((d1 + d2 - LIVING_BALCONY) / 2.3)) if big else 0.0,
+        "office": max(round(OFFICE_W * f, 2), MIN_HAB_W, POWDER_W + 1.0) if big else 0.0,
+        "beds": bed_widths,
         "servant": SERVANT_COL_W if servant else 0.0,
+        # Width held back for whichever bedroom ends the flat (see END_BED_W); plan_unit
+        # gives it to that bedroom and any remainder to the living room.
+        "end_extra": 0.0 if level == TWO_ROW else round(max(0.0, END_BED_W - min(bed_widths)), 2),
     }
 
 
-def _natural_size(beds: int, penthouse: bool, f: float) -> Tuple[float, float, Dict[str, Any]]:
-    cols = _layout_widths(beds, penthouse, f)
+def _natural_size(beds: int, penthouse: bool, f: float, level: int = FULL) -> Tuple[float, float, Dict[str, Any]]:
     tier = min(beds, 5)
-    # At least a 3.6 m deep living room behind its 1.8 m balcony.
-    d1 = max(round(FACADE_ROW[tier] * min(f, 1.2), 2), LIVING_BALCONY + 3.6)
+    d1 = max(round(FACADE_ROW[tier] * min(f, 1.2), 2), LIVING_BALCONY + MIN_LIVING_D)
+    d2 = max(round(SERVICE_ROW[tier] * min(f, 1.0), 2), MIN_TWO_ROW_D if level == TWO_ROW else MIN_SERVICE_D)
+    d3 = 0.0 if level == TWO_ROW else max(round(ENTRY_ROW[tier] * min(f, 1.0), 2), MIN_ENTRY_D)
+    cols = _layout_widths(beds, penthouse, f, level, d1, d2)
+    # A two-row 2 BHK keeps its shaft at the far end of the wing (see plan_unit).
+    shaft = SHAFT_W if level == TWO_ROW and beds == 2 else 0.0
     width = (cols["utility"] + cols["kitchen"] + cols["living"] + cols["family"] + cols["office"]
-             + sum(cols["beds"]) + cols["servant"])
-    depth = d1 + SERVICE_ROW[tier] + ENTRY_ROW[tier]
-    return round(width, 2), round(depth, 2), {**cols, "d1": d1}
+             + sum(cols["beds"]) + cols["servant"] + cols["end_extra"] + shaft)
+    return round(width, 2), round(d1 + d2 + d3, 2), {**cols, "d1": d1, "d2": d2, "d3": d3, "level": level}
+
+
+def plan_carpet(rooms: Sequence[Dict[str, Any]]) -> float:
+    """RERA carpet area of a planned flat: every room except balconies, terraces, the dry
+    balcony and the shaft."""
+    return round(sum(r["w"] * r["h"] for r in rooms if r["type"] not in NOT_CARPET), 2)
+
+
+def _carpet_at(unit_type: str, carpet: float, f: float, level: int) -> float:
+    beds, penthouse, _ = _tier(unit_type, carpet)
+    w, h, _ = _natural_size(beds, penthouse, f, level)
+    rooms, _ = plan_unit({"x": 0.0, "y": 0.0, "w": w, "h": h}, unit_type, carpet, "S", "probe", 0, ["N"],
+                         _sizing=(f, level, None))
+    return plan_carpet(rooms)
+
+
+@lru_cache(maxsize=4096)
+def sizing(unit_type: str, carpet: float) -> Tuple[float, int, Any]:
+    """(scale, level, warning) that makes the plan's carpet area match `carpet`.
+
+    The brief scales down until rooms reach their code floors, then the levels above save
+    space in order; past the last one the smallest plan is drawn and `warning` says so."""
+    beds, penthouse, prog = _tier(unit_type, carpet)
+    target = max(float(carpet or 0), 15.0)
+    levels = [FULL, NO_POOJA]
+    if beds <= 2 and not (beds >= 5 or penthouse) and not prog.get("servant"):
+        levels.append(TWO_ROW)
+    lo_f, hi_f = SCALE_LIMITS
+    label = f"{beds} BHK{' penthouse' if penthouse else ''}"
+    for level in levels:
+        smallest = _carpet_at(unit_type, carpet, lo_f, level)
+        if target < smallest * 0.98 and level != levels[-1]:
+            continue
+        if target < smallest * 0.98:
+            return lo_f, level, (f"{target:.0f} m² carpet is below the smallest {label} plan with every room "
+                                 f"at its NBC 2016 minimum ({smallest:.0f} m²); drawn at {smallest:.0f} m².")
+        largest = _carpet_at(unit_type, carpet, hi_f, level)
+        if target > largest * 1.02:
+            return hi_f, level, (f"{target:.0f} m² carpet is above the largest {label} plan the brief "
+                                 f"scales to ({largest:.0f} m²); drawn at {largest:.0f} m².")
+        a, b = lo_f, hi_f              # carpet rises with the scale: smallest f that reaches target
+        for _ in range(28):
+            m = (a + b) / 2
+            if _carpet_at(unit_type, carpet, m, level) >= target:
+                b = m
+            else:
+                a = m
+        lower, upper = _carpet_at(unit_type, carpet, a, level), _carpet_at(unit_type, carpet, b, level)
+        return (a if abs(lower - target) < abs(upper - target) else b), level, None
+    return lo_f, levels[-1], None
 
 
 def scale_for(unit_type: str, carpet: float) -> float:
-    beds, penthouse, _ = _tier(unit_type, carpet)
-    w0, h0, _ = _natural_size(beds, penthouse, 1.0)
-    target = max(float(carpet or 0), 20.0) * GROSS_PER_CARPET
-    f = math.sqrt(target / (w0 * h0))
-    return max(SCALE_LIMITS[0], min(SCALE_LIMITS[1], f))
+    return sizing(unit_type, carpet)[0]
 
 
 def envelope(unit_type: str, carpet: float) -> Tuple[float, float]:
     """(width along the corridor, depth) of the flat this brief produces."""
     beds, penthouse, _ = _tier(unit_type, carpet)
-    w, h, _ = _natural_size(beds, penthouse, scale_for(unit_type, carpet))
+    f, level, _ = sizing(unit_type, float(carpet or 0))
+    w, h, _ = _natural_size(beds, penthouse, f, level)
     return w, h
 
 
@@ -133,7 +233,7 @@ def _place(rect: Dict[str, float], plan_w: float, plan_h: float, entry_edge: str
 def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: str,
               uid: str, unit_index: int, exterior_edges: Sequence[str],
               mirror: bool = False, master_last: bool = False, split: int = 0,
-              servant_first: bool = False) -> Tuple[List[Dict[str, Any]], List[str]]:
+              servant_first: bool = False, _sizing=None) -> Tuple[List[Dict[str, Any]], List[str]]:
     """Plan one flat inside `box` (normally sized by `envelope`). Returns (rooms, notes).
 
     `mirror` flips the plan end for end; `master_last` puts the master bedroom at the far
@@ -145,8 +245,11 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     tier = min(beds, 5)
     big = beds >= 5 or penthouse
     servant = bool(prog.get("servant"))
-    f = scale_for(unit_type, carpet)
-    nat_w, nat_h, cols = _natural_size(beds, penthouse, f)
+    f, level, warning = _sizing or sizing(unit_type, float(carpet or 0))
+    two_row = level == TWO_ROW
+    if two_row and beds == 2:
+        split = 1   # one bedroom each side of the core, so both lobbies reach the foyer/dining
+    nat_w, nat_h, cols = _natural_size(beds, penthouse, f, level)
 
     canonical = entry_edge in ("S", "N")
     plan_w, plan_h = (float(box["w"]), float(box["h"])) if canonical else (float(box["h"]), float(box["w"]))
@@ -159,7 +262,7 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     # and the facade row, never to a strip of leftover space.
     cols["living"] = round(cols["living"] + (plan_w - nat_w), 3)
     d1 = round(cols["d1"] + (plan_h - nat_h), 3)
-    d2, d3 = SERVICE_ROW[tier], ENTRY_ROW[tier]
+    d2, d3 = cols["d2"], cols["d3"]
     y2, y3 = d1, d1 + d2
 
     rooms: List[Dict[str, Any]] = []
@@ -203,6 +306,21 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     if servant and not servant_first:
         seq.append(("servant", None))
 
+    extra = cols["end_extra"]
+    if extra:
+        cols["beds"] = list(cols["beds"])
+        if seq[-1][0] == "bed":
+            last = seq[-1][1]
+            need = round(max(0.0, END_BED_W - cols["beds"][last]), 3)
+            cols["beds"][last] = round(cols["beds"][last] + need, 3)
+            extra = round(extra - need, 3)
+        lw = cols["living"] = round(cols["living"] + extra, 3)
+    end_shaft = two_row and beds == 2
+    if end_shaft:
+        # The bedroom after the core ends the flat; its column carries the shaft behind it,
+        # since the foyer cell must stay free for the other bedroom's lobby.
+        cols["beds"] = list(cols["beds"])
+        cols["beds"][order[split]] = round(cols["beds"][order[split]] + SHAFT_W, 3)
     width_of = {"utility": uw, "kitchen": kw, "living": lw, "family": cols["family"],
                 "office": cols["office"], "servant": cols["servant"]}
     xs: Dict[Tuple[str, Any], float] = {}
@@ -223,12 +341,19 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         emit("pantry", "Pantry & Dry Store", "pantry", x_util, ud, uw, d1 - ud, door_to="kitchen")
     else:
         emit("store", "Kitchen Store", "storage", x_util, ud, uw, d1 - ud, door_to="kitchen")
-    emit("kitchen", "Kitchen", "kitchen", x_util + uw, 0, kw, d1, has_window=True, door_to="breakfast",
+    emit("kitchen", "Kitchen", "kitchen", x_util + uw, 0, kw, d1, has_window=True,
+         door_to="foyer" if two_row else "breakfast",
          hob_faces="East")
     emit("lbalcony", f"Living {terrace}", "terrace" if penthouse else "balcony", x_living, 0, lw, LIVING_BALCONY,
          has_window=True, projects_from=f"{uid}-living")
-    emit("living", "Living Room", "living", x_living, LIVING_BALCONY, lw, d1 - LIVING_BALCONY,
-         has_window=True, door_to="dining")
+    omitted = [] if level == FULL else ["pooja"] + (["breakfast", "passage"] if two_row else [])
+    if two_row:
+        # Living and dining are one room through both rows; the foyer and lobbies open onto it.
+        emit("living", "Living & Dining", "living", x_living, LIVING_BALCONY, lw, d1 + d2 - LIVING_BALCONY,
+             has_window=True, door_to="foyer", omitted_for_space=omitted)
+    else:
+        emit("living", "Living Room", "living", x_living, LIVING_BALCONY, lw, d1 - LIVING_BALCONY,
+             has_window=True, door_to="dining", **({"omitted_for_space": omitted} if omitted else {}))
     if cols["family"]:
         fx, fw = xs[("family", None)], cols["family"]
         emit("fbalcony", f"Family Lounge {terrace}", "terrace" if penthouse else "balcony", fx, 0, fw,
@@ -266,14 +391,26 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
              door_to="passage", door_via="servantlobby")
 
     # ------------------------------------------------------------ R2: the service row
-    emit("breakfast", "Breakfast & Crockery", "dining", x_util, y2, uw + kw, d2, door_to="kitchen")
-    pw = POOJA_W[tier]
+    if two_row:
+        # The breakfast area's place: the entrance foyer, the main door on the corridor wall.
+        # A 1 BHK puts the shaft at its outer end beside the kitchen; a 2 BHK needs that end
+        # for the first bedroom's lobby and keeps the shaft at the far end of the wing.
+        fx0 = 0.0 if end_shaft else SHAFT_W
+        if not end_shaft:
+            emit("shaft", "MEP Shaft", "shaft", x_util, y2, SHAFT_W, d2, has_window=False)
+        emit("foyer", "Entrance Foyer", "entrance", x_util + fx0, y2, uw + kw - fx0, d2,
+             door_to="living", main_entrance=True, entry_edge=entry_edge)
+    else:
+        emit("breakfast", "Breakfast & Crockery", "dining", x_util, y2, uw + kw, d2, door_to="kitchen")
+    pw = POOJA_W[tier] if level == FULL else 0.0
     excess = (lw - pw) - 2.2 * d2
-    if 0 < excess <= 1.2:
+    if pw and 0 < excess <= 1.2:
         pw = round(pw + excess, 3)       # a little too long for dining: the pooja room takes it
     dining_w = lw - pw
     max_dining = round(2.2 * d2, 3)          # beyond this a dining room reads as a corridor
-    if dining_w > max_dining + 1.2:
+    if two_row:
+        pass
+    elif dining_w > max_dining + 1.2:
         emit("dining", "Dining", "dining", x_living, y2, max_dining, d2, has_window=False, door_to="living")
         emit("crockery", "Crockery & Bar", "storage", x_living + max_dining, y2, dining_w - max_dining, d2,
              door_to="dining")
@@ -281,8 +418,9 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         emit("dining", "Dining", "dining", x_living, y2, dining_w, d2, has_window=False, door_to="living")
     # Pooja at the far end of the living room from the kitchen: its other neighbour is a
     # lounge or a lobby, never a bath.
-    emit("pooja", "Pooja Niche" if tier == 1 else "Pooja Room", "pooja", x_living + lw - pw, y2, pw, d2,
-         door_to="living", faces="East")
+    if pw:
+        emit("pooja", "Pooja Niche" if tier == 1 else "Pooja Room", "pooja", x_living + lw - pw, y2, pw, d2,
+             door_to="living", faces="East")
     if x_office is not None:
         # Store on the lounge side, powder room on the bedroom side: a powder room may not
         # share a wall with a living space.
@@ -298,6 +436,9 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     ensuites = int(prog.get("ensuites") or 1)
     common = int(prog.get("common_baths") or 0)
     for i, key, name, bx, bw in bed_xs:
+        if end_shaft and bx > x_util:
+            bw = round(bw - SHAFT_W, 3)
+            emit("shaft", "MEP Shaft", "shaft", bx + bw, y2, SHAFT_W, d2, has_window=False)
         slot = round(min(BATH_SLOT_W, bw - MIN_LOBBY_W), 3)
         lobby_w = round(bw - slot, 3)
         closet_w = 0.0
@@ -305,10 +446,14 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
             closet_w = round(lobby_w - MIN_LOBBY_W, 3)
             lobby_w = round(lobby_w - closet_w, 3)
         # Lobby first: it is what the room on this column's left (the pooja room, a lounge)
-        # touches, so no bath ever shares a wall with the pooja room.
-        emit(f"{key}lobby", f"{name} Lobby", "passage", bx, y2, lobby_w, d2, door_to="passage")
+        # touches, so no bath ever shares a wall with the pooja room. Without the passage
+        # row, a bedroom before the core turns its lobby to the core side instead.
+        pre_core = two_row and bx < x_util
+        lobby_x = bx + bw - lobby_w if pre_core else bx
+        emit(f"{key}lobby", f"{name} Lobby", "passage", lobby_x, y2, lobby_w, d2,
+             door_to=("foyer" if pre_core else "living") if two_row else "passage")
         passage_doors.append(bx)
-        cx = bx + lobby_w
+        cx = bx if pre_core else bx + lobby_w
         if closet_w:
             emit("mcloset", "Walk-in Closet", "closet", cx, y2, closet_w, d2, door_child_of=key)
             cx += closet_w
@@ -318,7 +463,7 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         elif common > 0:
             common -= 1
             emit(f"{key}cbath", "Common Bathroom", "bathroom", cx, y2, slot, d2,
-                 door_to="passage", has_window=False)
+                 door_to=f"{key}lobby" if two_row else "passage", has_window=False)
             passage_doors.append(cx)
         else:
             emit(f"{key}wardrobe", f"{name} Wardrobe", "closet", cx, y2, slot, d2, door_child_of=key)
@@ -331,33 +476,41 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     # ------------------------------------------------------------ R3: the entry row
     # Foyer under the kitchen block; private passages run from it to both ends; the wet
     # stack (powder room, shaft) closes the end away from the core.
-    foyer_x = x_util
-    foyer_w = round(min(3.0, max(2.0, uw + kw)), 3)
-    emit("foyer", "Entrance Foyer", "entrance", foyer_x, y3, foyer_w, d3, door_to="breakfast",
-         main_entrance=True, entry_edge=entry_edge)
-    if foyer_x > 0.05:
-        emit("passage2", "Private Passage", "passage", 0, y3, foyer_x, d3, door_to="foyer")
-    has_powder_tail = beds >= 4 and x_office is None
-    tail = SHAFT_W + (POWDER_W if has_powder_tail else 0.0)
-    if has_powder_tail and passage_doors and plan_end - tail < max(passage_doors) + DOOR_W:
-        # The powder room would sit under the end column's lobby or bath and wall its door
-        # off from the passage; the wet stack keeps just the shaft.
-        has_powder_tail, tail = False, SHAFT_W
-    emit("passage", "Private Passage", "passage", foyer_x + foyer_w, y3, plan_end - tail - foyer_x - foyer_w, d3,
-         door_to="foyer")
-    x = plan_end - tail
-    if has_powder_tail:
-        # Guest powder room on the wet stack, off the passage.
-        emit("powder", "Powder Room", "bathroom", x, y3, POWDER_W, d3, door_to="passage", has_window=False)
-        x += POWDER_W
-    emit("shaft", "MEP Shaft", "shaft", x, y3, SHAFT_W, d3, has_window=False)
+    if not two_row:
+        foyer_x = x_util
+        foyer_w = round(min(3.0, max(2.0, uw + kw)), 3)
+        emit("foyer", "Entrance Foyer", "entrance", foyer_x, y3, foyer_w, d3, door_to="breakfast",
+             main_entrance=True, entry_edge=entry_edge)
+        if foyer_x > 0.05:
+            emit("passage2", "Private Passage", "passage", 0, y3, foyer_x, d3, door_to="foyer")
+        has_powder_tail = beds >= 4 and x_office is None
+        tail = SHAFT_W + (POWDER_W if has_powder_tail else 0.0)
+        if has_powder_tail and passage_doors and plan_end - tail < max(passage_doors) + DOOR_W:
+            # The powder room would sit under the end column's lobby or bath and wall its door
+            # off from the passage; the wet stack keeps just the shaft.
+            has_powder_tail, tail = False, SHAFT_W
+        emit("passage", "Private Passage", "passage", foyer_x + foyer_w, y3, plan_end - tail - foyer_x - foyer_w, d3,
+             door_to="foyer")
+        x = plan_end - tail
+        if has_powder_tail:
+            # Guest powder room on the wet stack, off the passage.
+            emit("powder", "Powder Room", "bathroom", x, y3, POWDER_W, d3, door_to="passage", has_window=False)
+            x += POWDER_W
+        emit("shaft", "MEP Shaft", "shaft", x, y3, SHAFT_W, d3, has_window=False)
 
     notes = [
         "Rooms sized from the brief for this BHK tier and scaled to the carpet area "
-        f"(x{f:.2f}); the envelope follows the rooms, nothing is stretched to fill space.",
+        f"(x{f:.2f}, {plan_carpet(rooms):.1f} m² carpet drawn); no room goes below its NBC 2016 minimum.",
+        "Main door -> foyer -> living & dining; bedrooms open onto lobbies off the foyer and living."
+        if two_row else
         "Main door -> foyer -> breakfast and dining -> living; bedrooms open onto lobbies off the private passage.",
-        "Every habitable room, kitchen included, sits on the facade; the wet stack is at the bedroom end.",
+        "Every habitable room, kitchen included, sits on the facade; the wet stack is at the bedroom end."
+        if not two_row else "Every habitable room, kitchen included, sits on the facade; the shaft is beside the kitchen.",
     ]
+    if level in LEVEL_NOTES:
+        notes.append(LEVEL_NOTES[level])
+    if warning:
+        notes.append("Warning: " + warning)
     return rooms, notes
 
 

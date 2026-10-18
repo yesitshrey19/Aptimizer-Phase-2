@@ -487,3 +487,64 @@ def test_too_small_carpet_is_drawn_at_the_nbc_minimum_with_a_warning():
     for r in rooms:
         defects += _nbc_defects(r)
     assert defects == []
+
+
+# ------------------------------------------ Vastu: rule cases behave as written (S2-087)
+# The app's audit places each anchor room (pooja, kitchen, master bedroom) in one cell of
+# a 3x3 grid over its flat, north at the top, and marks it met when that cell is the
+# target (pooja NE, kitchen SE, master SW). Checked here against an independent 3x3
+# placement of the same rooms, over 1-5 BHK flats on low and top floors; the MEP-shaft
+# claim ("stack grouping") is checked as shafts sitting in the same place floor to floor.
+VASTU_TARGETS = {"pooja": "NE", "kitchen": "SE", "master": "SW"}
+VASTU_SWEEP = {"1bhk": (50, 60), "2bhk": (70, 90), "3bhk": (100, 130), "4bhk": (150, 200), "5bhk": (200, 260)}
+
+
+def _grid_cell(room, box):
+    x0, y0, w, h = box
+    cx, cy = room["x"] + room["w"] / 2, room["y"] + room["h"] / 2
+    col = min(2, int((cx - x0) / w * 3))
+    row = min(2, int((cy - y0) / h * 3))
+    return (("NW", "N", "NE"), ("W", "CENTER", "E"), ("SW", "S", "SE"))[row][col]
+
+
+def vastu_rule_cases():
+    disagreements, met, placed, shaft_moves, floors_compared = [], {k: 0 for k in VASTU_TARGETS}, \
+        {k: 0 for k in VASTU_TARGETS}, 0, 0
+    for unit_type, carpets in VASTU_SWEEP.items():
+        for carpet in carpets:
+            tower = {"id": f"v-{unit_type}-{carpet}", "floors": 12, "corridor_width": 2.0,
+                     "units": [{"type": unit_type, "count": 2, "carpet_area": carpet}]}
+            shafts_by_floor = {}
+            for floor in (2, 3, 12):
+                rooms, validation = aifloorplan.generate_architectural_template(tower, floor)
+                audits = validation["vastu"]["unit_audits"]
+                shafts_by_floor[floor] = sorted((r["unit_id"], r["x"], r["y"], r["w"], r["h"])
+                                                for r in rooms if r["type"] == "shaft")
+                for uid, audit in audits.items():
+                    rs = [r for r in rooms if r.get("unit_id") == uid]
+                    x0, y0 = min(r["x"] for r in rs), min(r["y"] for r in rs)
+                    box = (x0, y0, max(r["x"] + r["w"] for r in rs) - x0, max(r["y"] + r["h"] for r in rs) - y0)
+                    picks = {"pooja": next((r for r in rs if r["type"] == "pooja"), None),
+                             "kitchen": next((r for r in rs if r["type"] == "kitchen"), None),
+                             "master": next((r for r in rs if r["id"].endswith("-mbed")), None)}
+                    for key, room in picks.items():
+                        report = audit["anchors"][key]
+                        if room is None:
+                            continue
+                        placed[key] += 1
+                        cell = _grid_cell(room, box)
+                        mine = cell == VASTU_TARGETS[key]
+                        met[key] += mine
+                        if report["sector"] != cell or bool(report["met"]) != mine:
+                            disagreements.append(f"{unit_type} {carpet} m2 floor {floor} {uid} {key}: "
+                                                 f"audit {report['sector']}/{report['met']}, grid {cell}/{mine}")
+            # Shafts on the typical floors (2 and 3) should stack.
+            floors_compared += 1
+            shaft_moves += shafts_by_floor[2] != shafts_by_floor[3]
+    return {"placed": placed, "met": met, "disagreements": disagreements,
+            "shaft_moves": shaft_moves, "floors_compared": floors_compared}
+
+
+def test_vastu_audit_places_anchor_rooms_as_its_rule_says():
+    result = vastu_rule_cases()
+    assert result["disagreements"] == []

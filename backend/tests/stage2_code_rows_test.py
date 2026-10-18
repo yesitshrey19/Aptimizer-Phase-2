@@ -256,3 +256,66 @@ RERA_PARKING = {
 def test_parking_matches_the_approved_bbmp_plans(key):
     towers, plot, expected = RERA_PARKING[key]
     assert parking_required([_parking_tower(*t) for t in towers], plot) == expected
+
+
+# ------------------------------------------------- NBC 2016 Part 3 room minimums (row S2)
+# Every room of every flat the app's floor planner draws, against NBC 2016 Part 3 minima
+# typed in here from the book (Cl. 12.2-12.4, p. 43-44), not read from floorplan/spec.py:
+# habitable 7.5 m2 and 2.4 m wide with at least one room >= 9.5 m2 per flat (12.2.2),
+# kitchen 5.5 m2 and 1.8 m (12.3.2), bath + WC 2.8 m2 and 1.2 m, WC alone 1.1 m2 and
+# 0.9 m (12.4.2). Sweep: 1-5 BHK across their carpet ranges, low/mid floors and the
+# penthouse top floor.
+import aifloorplan
+
+NBC_HABITABLE = {"bedroom", "living", "servant", "office", "family", "study", "guest"}
+NBC_SWEEP = {"1bhk": range(25, 91, 5), "2bhk": range(40, 141, 5), "3bhk": range(60, 201, 5),
+             "4bhk": range(90, 281, 10), "5bhk": range(130, 361, 10)}
+NBC_FLOORS = ((4, 1), (4, 3), (12, 6), (12, 12))
+
+
+def _nbc_defects(room):
+    name, rtype = room["name"].lower(), room["type"]
+    area, width = room["w"] * room["h"], min(room["w"], room["h"])
+    if rtype == "bathroom" or any(k in name for k in ("bath", "toilet", "powder")):
+        a_min, w_min = (1.1, 0.9) if "powder" in name else (2.8, 1.2)
+    elif rtype in NBC_HABITABLE:
+        a_min, w_min = 7.5, 2.4
+    elif rtype == "kitchen":
+        a_min, w_min = 5.5, 1.8
+    else:
+        return []
+    out = []
+    if area < a_min - 1e-6:
+        out.append(f"{room['id']} {area:.2f} m2 < {a_min}")
+    if width < w_min - 1e-6:
+        out.append(f"{room['id']} {width:.2f} m wide < {w_min}")
+    return out
+
+
+def nbc_room_defects():
+    defects, flats = [], 0
+    for unit_type, carpets in NBC_SWEEP.items():
+        for carpet in carpets:
+            for floors, floor in NBC_FLOORS:
+                tower = {"id": f"nbc-{unit_type}-{carpet}", "floors": floors, "corridor_width": 2.0,
+                         "units": [{"type": unit_type, "count": 2, "carpet_area": carpet}]}
+                rooms, _ = aifloorplan.generate_architectural_template(tower, floor)
+                by_flat = {}
+                for r in rooms:
+                    if r.get("unit_id"):
+                        by_flat.setdefault(r["unit_id"], []).append(r)
+                for uid, rs in by_flat.items():
+                    flats += 1
+                    tag = f"{unit_type} {carpet} m2 floor {floor}/{floors}"
+                    habitable = [r["w"] * r["h"] for r in rs
+                                 if r["type"] in NBC_HABITABLE and "bath" not in r["name"].lower()]
+                    if habitable and max(habitable) < 9.5 - 1e-6:
+                        defects.append(f"{tag} {uid}: no habitable room >= 9.5 m2")
+                    defects += [f"{tag} {d}" for r in rs for d in _nbc_defects(r)]
+    return flats, defects
+
+
+def test_every_planned_room_meets_nbc_2016_part_3_minimums():
+    flats, defects = nbc_room_defects()
+    assert flats == 864
+    assert defects == []

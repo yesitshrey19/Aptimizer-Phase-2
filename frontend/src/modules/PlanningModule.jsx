@@ -663,7 +663,11 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
 
   useEffect(() => {
     if (!t) return;
-    if (!t.floor_layouts?.[String(floor)]) fetchFloorLayout(false);
+    // A stored floor shows the checks saved with it (Vastu audit, flat-size warnings);
+    // an unvisited one is generated, which sets them from the response.
+    const stored = t.floor_layouts?.[String(floor)];
+    if (stored) setFloorValidation(stored.validation || {});
+    else fetchFloorLayout(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t?.id, floor]);
 

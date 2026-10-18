@@ -319,3 +319,138 @@ def test_every_planned_room_meets_nbc_2016_part_3_minimums():
     flats, defects = nbc_room_defects()
     assert flats == 864
     assert defects == []
+
+
+# -------------------------------------- App plans 1-10: outside window + reachable (S2)
+# Ten floor plates from the app's planner, checked from the geometry alone -- the room
+# rectangles -- never from the planner's own has_window flag.
+#   Window: every habitable room (bedroom, living, kitchen, office, servant, family) needs
+#   enough wall open to air for a window of 1/8 of its floor area (NBC 2016 Part 3 Cl.
+#   20.1.2, Bengaluru temperate), taking a 1.2 m tall window (0.9 m sill, 2.1 m lintel).
+#   A wall is open where the far side is outside the building or a balcony/terrace/dry
+#   balcony; never the corridor or a neighbouring flat.
+#   Reachable: each declared door must sit on a wall the two rooms really share, at least
+#   the door's width long; walking those doors from the foyer -- which must open off the
+#   corridor -- has to reach every room of the flat.
+APP_PLANS = {
+    1: ("1BHK x4, floor 1 of 4", 4, 1, [("1bhk", 4, 45)]),
+    2: ("2BHK x4, floor 3 of 8", 8, 3, [("2bhk", 4, 65)]),
+    3: ("3BHK x4, floor 5 of 12", 12, 5, [("3bhk", 4, 100)]),
+    4: ("4BHK x2, floor 2 of 10", 10, 2, [("4bhk", 2, 150)]),
+    5: ("5BHK x2, floor 4 of 10", 10, 4, [("5bhk", 2, 220)]),
+    6: ("1BHK + 2BHK x2 + 3BHK, floor 1 of 6", 6, 1, [("1bhk", 1, 40), ("2bhk", 2, 60), ("3bhk", 1, 95)]),
+    7: ("2BHK x3 + 3BHK x3, floor 7 of 14", 14, 7, [("2bhk", 3, 70), ("3bhk", 3, 110)]),
+    8: ("3BHK x2 penthouse, floor 12 of 12", 12, 12, [("3bhk", 2, 120)]),
+    9: ("4BHK x2 penthouse, floor 10 of 10", 10, 10, [("4bhk", 2, 160)]),
+    10: ("2BHK x6 + 3BHK x2 (8 per floor), floor 2 of 15", 15, 2, [("2bhk", 6, 60), ("3bhk", 2, 90)]),
+}
+WINDOW_TYPES = {"bedroom", "living", "kitchen", "office", "servant", "family"}
+OPEN_TYPES = {"balcony", "terrace", "utility"}
+WINDOW_H, STEP, EPS = 1.2, 0.05, 0.02
+
+
+def app_plan_rooms(n):
+    _, floors, floor, mix = APP_PLANS[n]
+    tower = {"id": f"plan-{n}", "floors": floors, "corridor_width": 2.0,
+             "units": [{"type": t, "count": c, "carpet_area": a} for t, c, a in mix]}
+    rooms, _ = aifloorplan.generate_architectural_template(tower, floor)
+    return rooms
+
+
+def _inside(r, x, y):
+    return r["x"] < x < r["x"] + r["w"] and r["y"] < y < r["y"] + r["h"]
+
+
+def _open_wall_length(room, rooms):
+    """Metres of the room's perimeter whose far side is open air (or a balcony)."""
+    x0, y0, x1, y1 = room["x"], room["y"], room["x"] + room["w"], room["y"] + room["h"]
+    edges = [((x0, y0), (x1, y0), (0, -1)), ((x0, y1), (x1, y1), (0, 1)),
+             ((x0, y0), (x0, y1), (-1, 0)), ((x1, y0), (x1, y1), (1, 0))]
+    total = 0.0
+    for (ax, ay), (bx, by), (nx, ny) in edges:
+        length = abs(bx - ax) + abs(by - ay)
+        steps = max(int(length / STEP), 1)
+        for i in range(steps):
+            t = (i + 0.5) / steps
+            px, py = ax + (bx - ax) * t + nx * EPS, ay + (by - ay) * t + ny * EPS
+            beyond = [r for r in rooms if r is not room and _inside(r, px, py)]
+            if all(r["type"] in OPEN_TYPES for r in beyond):
+                total += length / steps
+    return total
+
+
+def _shared_wall(a, b):
+    """Length of wall two rectangles share (0 if they only touch at a corner or not at all)."""
+    def overlap(p0, p1, q0, q1):
+        return max(0.0, min(p1, q1) - max(p0, q0))
+    ax1, ay1, bx1, by1 = a["x"] + a["w"], a["y"] + a["h"], b["x"] + b["w"], b["y"] + b["h"]
+    if abs(ax1 - b["x"]) < 0.011 or abs(bx1 - a["x"]) < 0.011:
+        return overlap(a["y"], ay1, b["y"], by1)
+    if abs(ay1 - b["y"]) < 0.011 or abs(by1 - a["y"]) < 0.011:
+        return overlap(a["x"], ax1, b["x"], bx1)
+    return 0.0
+
+
+def app_plan_defects(n):
+    rooms = app_plan_rooms(n)
+    corridor = [r for r in rooms if not r.get("unit_id")]
+    flats = {}
+    for r in rooms:
+        if r.get("unit_id"):
+            flats.setdefault(r["unit_id"], []).append(r)
+    defects, checked = [], {"flats": len(flats), "window_rooms": 0}
+    for uid, rs in flats.items():
+        # windows
+        for r in rs:
+            if r["type"] not in WINDOW_TYPES or "bath" in r["name"].lower():
+                continue
+            checked["window_rooms"] += 1
+            need = r["w"] * r["h"] / 8 / WINDOW_H
+            have = _open_wall_length(r, rooms)
+            if have + 1e-6 < need:
+                defects.append(f"{r['id']}: {have:.2f} m of open wall, needs {need:.2f} m for a 1/8 window")
+
+        # doors. "passage" names the flat's private passage, which can be two pieces
+        # either side of the foyer; breakfast and dining are one open space, no door.
+        by_key = {r["id"][len(uid) + 1:]: r for r in rs}
+        passages = [r for r in rs if r["name"] == "Private Passage"]
+        graph = {r["id"]: set() for r in rs}
+        dining = [r for r in rs if r["type"] == "dining"]
+        for a in dining:
+            for b in dining:
+                if a is not b and _shared_wall(a, b) >= 0.9:
+                    graph[a["id"]].add(b["id"])
+        for r in rs:
+            target = r.get("door_via") or r.get("door_to") or r.get("door_child_of")
+            if not target:
+                continue
+            options = passages if target == "passage" else [by_key[target]] if target in by_key else []
+            door_w = float(r.get("door_width_mm") or 900) / 1000
+            if not options:
+                defects.append(f"{r['id']}: door leads to '{target}', which is not in the flat")
+                continue
+            other = max(options, key=lambda o: _shared_wall(r, o))
+            if _shared_wall(r, other) + 1e-6 < door_w:
+                defects.append(f"{r['id']}: door to {target} but they share only "
+                               f"{_shared_wall(r, other):.2f} m of wall (door {door_w:.2f} m)")
+            else:
+                graph[r["id"]].add(other["id"]); graph[other["id"]].add(r["id"])
+        foyer = next((r for r in rs if r.get("main_entrance")), None)
+        if foyer is None or not any(_shared_wall(foyer, c) >= 0.9 for c in corridor):
+            defects.append(f"{uid}: main door does not open off the corridor")
+            continue
+        seen, todo = {foyer["id"]}, [foyer["id"]]
+        while todo:
+            for nxt in graph[todo.pop()] - seen:
+                seen.add(nxt); todo.append(nxt)
+        for r in rs:
+            if r["id"] not in seen and r["type"] not in ("shaft", "balcony", "terrace"):
+                defects.append(f"{r['id']}: cannot be reached from the main door")
+    return checked, defects
+
+
+@pytest.mark.parametrize("n", list(APP_PLANS))
+def test_app_plan_rooms_have_outside_window_and_are_reachable(n):
+    checked, defects = app_plan_defects(n)
+    assert checked["window_rooms"] > 0
+    assert defects == []

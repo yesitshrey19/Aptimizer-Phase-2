@@ -56,6 +56,7 @@ SHAFT_W = 0.9
 POWDER_W = 1.8
 POOJA_W = {1: 1.1, 2: 1.4, 3: 1.5, 4: 1.6, 5: 1.8}
 BATH_SLOT_W = 2.1           # en-suite / common bath width behind a bedroom
+DOOR_W = 0.9                # clear width a door onto the passage needs
 MIN_LOBBY_W = 1.05          # a bedroom door needs a lobby at least a door-and-frame wide
 SERVANT_LOBBY_W = 1.2
 MAX_STORE_RATIO = 3.1       # a store deeper than this x its width reads as a strip
@@ -234,14 +235,17 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
              LIVING_BALCONY, has_window=True, projects_from=f"{uid}-family")
         # The lounge takes its column through the service row too, so dining stays a
         # room-shaped space behind the living room instead of a long strip.
+        # Open to the living room beside it; the pooja room, not the dining, is its other neighbour.
         emit("family", "Family Lounge", "living", fx, LIVING_BALCONY, fw, d1 + d2 - LIVING_BALCONY,
-             has_window=True, door_to="dining")
+             has_window=True, door_to="living")
     if x_office is not None:
         ow = cols["office"]
         emit("obalcony", "Office Balcony", "balcony", x_office, 0, ow, SECONDARY_BALCONY,
              has_window=True, projects_from=f"{uid}-office")
+        # Its store and powder room fill the service row below it, so the door opens off the
+        # lounge (or living room) beside it, the one neighbour it shares a full wall with.
         emit("office", "Home Office", "office", x_office, SECONDARY_BALCONY, ow, d1 - SECONDARY_BALCONY,
-             has_window=True, door_to="passage")
+             has_window=True, door_to="family" if cols["family"] else "living")
     bed_xs = []
     for i in order:
         bx, bw = xs[("bed", i)], cols["beds"][i]
@@ -290,6 +294,7 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
             pr_w, st_w = cols["office"], 0.0
         emit("powder", "Powder Room", "bathroom", x_office + st_w, y2, pr_w, d2, door_to="passage", has_window=False)
 
+    passage_doors = []      # canonical x where each service-row door onto the passage starts
     ensuites = int(prog.get("ensuites") or 1)
     common = int(prog.get("common_baths") or 0)
     for i, key, name, bx, bw in bed_xs:
@@ -302,6 +307,7 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         # Lobby first: it is what the room on this column's left (the pooja room, a lounge)
         # touches, so no bath ever shares a wall with the pooja room.
         emit(f"{key}lobby", f"{name} Lobby", "passage", bx, y2, lobby_w, d2, door_to="passage")
+        passage_doors.append(bx)
         cx = bx + lobby_w
         if closet_w:
             emit("mcloset", "Walk-in Closet", "closet", cx, y2, closet_w, d2, door_child_of=key)
@@ -313,10 +319,12 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
             common -= 1
             emit(f"{key}cbath", "Common Bathroom", "bathroom", cx, y2, slot, d2,
                  door_to="passage", has_window=False)
+            passage_doors.append(cx)
         else:
             emit(f"{key}wardrobe", f"{name} Wardrobe", "closet", cx, y2, slot, d2, door_child_of=key)
     if x_servant is not None:
         emit("servantlobby", "Service Lobby", "passage", x_servant, y2, SERVANT_LOBBY_W, d2, door_to="passage")
+        passage_doors.append(x_servant)
         emit("servantbath", "Servant Bath", "servant", x_servant + SERVANT_LOBBY_W, y2,
              cols["servant"] - SERVANT_LOBBY_W, d2, door_child_of="servant")
 
@@ -331,6 +339,10 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         emit("passage2", "Private Passage", "passage", 0, y3, foyer_x, d3, door_to="foyer")
     has_powder_tail = beds >= 4 and x_office is None
     tail = SHAFT_W + (POWDER_W if has_powder_tail else 0.0)
+    if has_powder_tail and passage_doors and plan_end - tail < max(passage_doors) + DOOR_W:
+        # The powder room would sit under the end column's lobby or bath and wall its door
+        # off from the passage; the wet stack keeps just the shaft.
+        has_powder_tail, tail = False, SHAFT_W
     emit("passage", "Private Passage", "passage", foyer_x + foyer_w, y3, plan_end - tail - foyer_x - foyer_w, d3,
          door_to="foyer")
     x = plan_end - tail

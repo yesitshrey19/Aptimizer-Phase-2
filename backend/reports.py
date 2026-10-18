@@ -248,7 +248,7 @@ def _vastu_audits_uncached(project: dict):
             stored = ((entry.get("validation") or {}).get("vastu")) or None
             try:
                 per_floor[int(key)] = stored or aifloorplan.audit_vastu_and_mep(
-                    rooms, int(key), floors)
+                    rooms, int(key), floors, rotation_deg=float(t.get("plan_rotation_deg") or 0.0))
             except Exception:
                 continue
         if per_floor:

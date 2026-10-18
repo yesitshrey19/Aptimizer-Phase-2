@@ -104,6 +104,12 @@ def apply_layout_to_tower(tower, engine_tower, name, policy=None):
     layouts = tower.get("floor_layouts") or {}
     tower["floor_layouts"] = {k: v for k, v in layouts.items()
                               if str(k).isdigit() and 1 <= int(k) <= floors}
+    # The plan's long (corridor) axis on site, anticlockwise from true east: the block's
+    # rotation, plus a quarter turn when the packed block is deeper than it is wide.
+    rot = float(engine_tower.get("rotation_deg") or 0.0)
+    if float(engine_tower.get("depth_m") or 0) > float(engine_tower.get("width_m") or 0):
+        rot += 90.0
+    tower["plan_rotation_deg"] = round(rot % 360.0, 2)
     tower["from_site_layout"] = True
     return tower
 

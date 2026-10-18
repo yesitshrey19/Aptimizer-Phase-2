@@ -32,6 +32,7 @@ from floorplan.design_guide import (
     ENTRY_PADA_RULES,
     audit_room_zones,
     mandala_zone_of,
+    compass_offset,
     room_zone_kind,
 )
 
@@ -43,7 +44,22 @@ ANCHOR_SECTORS = {
     "kitchen": ("SE",),
     "master": ("SW",),
 }
-# Sectors a room must never occupy.
+# Manual §1 fallbacks: "If NE is unavailable, default to East or North" (pooja); "Secondary
+# valid node is North-West" (kitchen). The master bedroom has none: "Strict placement in SW".
+ANCHOR_ACCEPTABLE = {
+    "pooja": ("E", "N"),
+    "kitchen": ("NW",),
+    "master": (),
+}
+# The manuals word the anchors both as 3x3 "sectors" (booklet) and as "quadrants" (the
+# Aptimizer manual). A "never" rule is broken if either reading puts the room there.
+ANCHOR_FORBIDDEN_QUADRANTS = {
+    "pooja": ("SE", "SW"),      # "never ... the South": the southern half
+    "kitchen": ("NE",),
+    "master": ("NE",),
+}
+# Sectors a room must never occupy. Manual: pooja "Never place in the South, South-West";
+# master "Never place in the North-East". Kitchen NE is the app's own rule.
 ANCHOR_FORBIDDEN = {
     "pooja": ("S", "SW"),
     "kitchen": ("NE",),
@@ -107,14 +123,13 @@ def overlaps(a, b) -> bool:
 
 
 def sector_of(r, box) -> str:
-    """Which Vastu quadrant a room's centroid falls in, within its own flat's box."""
-    cx = r["x"] + r["w"] / 2.0
-    cy = r["y"] + r["h"] / 2.0
-    mx = box["x"] + box["w"] / 2.0
-    my = box["y"] + box["h"] / 2.0
-    ns = "N" if cy <= my else "S"
-    ew = "E" if cx >= mx else "W"
-    return ns + ew
+    """Which Vastu quadrant a room's centroid falls in, within its own flat's box, in true
+    compass directions (see design_guide.compass_offset for the box's `rot_deg`)."""
+    off = compass_offset(r, box)
+    if off is None:
+        return "NE"
+    u, v = off
+    return ("N" if v >= 0 else "S") + ("E" if u >= 0 else "W")
 
 
 def on_edge(r, box, edge) -> bool:
@@ -808,14 +823,20 @@ def sector_report(rooms: Sequence[dict], box: dict) -> Dict[str, Any]:
         sec = mandala_zone_of(room, box)
         quadrant = sector_of(room, box)
         targets = ANCHOR_SECTORS.get(key, ())
+        acceptable = ANCHOR_ACCEPTABLE.get(key, ())
         forbidden = ANCHOR_FORBIDDEN.get(key, ())
         met = sec in targets
+        forbidden_hit = sec in forbidden or quadrant in ANCHOR_FORBIDDEN_QUADRANTS.get(key, ())
+        grade = ("forbidden" if forbidden_hit else "ideal" if met
+                 else "acceptable" if sec in acceptable else "missed")
         out[key] = {
             "placed": True, "sector": sec, "mandala_zone": sec, "quadrant": quadrant,
-            "target": targets, "met": met,
-            "forbidden_hit": sec in forbidden,
-            "detail": (f"in {sec}, its primary sector" if sec == (targets[0] if targets else None)
-                       else f"in {sec}, an accepted secondary sector" if met
+            "target": targets, "acceptable": acceptable, "met": met, "grade": grade,
+            "forbidden_hit": forbidden_hit,
+            "detail": (f"in {sec}, its primary sector" if met
+                       else f"in {sec}, the manual's fallback (target {'/'.join(targets)})" if grade == "acceptable"
+                       else (f"in {sec} ({quadrant} quadrant), which the manual forbids (target {'/'.join(targets)})")
+                       if grade == "forbidden"
                        else f"in {sec} — the target is {'/'.join(targets)}"),
         }
     return out

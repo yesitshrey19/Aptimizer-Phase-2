@@ -4,6 +4,7 @@ This module is the shared rule source for the floor-plan prompt, deterministic p
 and post-generation audit. Project-specific tower inputs still take precedence over the
 guide's default tower cycle.
 """
+import math
 
 GUIDE_TITLE = "Universal Architectural & Vastu Master Planning Guide"
 
@@ -62,16 +63,36 @@ ENTRY_PADA_RULES = {
 }
 
 
-def mandala_zone_of(room, box):
-    """Return a room centroid's 3x3 Mandala zone (north at the top, east at right)."""
+def compass_offset(room, box):
+    """A room centroid's offset from its flat's centre as (east, north), each scaled to
+    -1..1 across the flat, turned to true compass directions.
+
+    Plans are drawn with the top as plan-north and +x as plan-east. A flat box may carry
+    `rot_deg`: how far the building's plan-east axis is turned anticlockwise from true
+    east on site (the site layout's tower rotation). Zero leaves the plan as drawn."""
     width = float(box.get("w") or 0)
     height = float(box.get("h") or 0)
     if width <= 0 or height <= 0:
         return None
     cx = float(room.get("x") or 0) + float(room.get("w") or 0) / 2
     cy = float(room.get("y") or 0) + float(room.get("h") or 0) / 2
-    col = min(2, max(0, int((cx - float(box.get("x") or 0)) / width * 3)))
-    row = min(2, max(0, int((cy - float(box.get("y") or 0)) / height * 3)))
+    u = 2 * (cx - float(box.get("x") or 0)) / width - 1          # plan east +
+    v = 1 - 2 * (cy - float(box.get("y") or 0)) / height         # plan north + (y runs south)
+    rot = math.radians(float(box.get("rot_deg") or 0))
+    if rot:
+        u, v = u * math.cos(rot) - v * math.sin(rot), u * math.sin(rot) + v * math.cos(rot)
+    return max(-1.0, min(1.0, u)), max(-1.0, min(1.0, v))
+
+
+def mandala_zone_of(room, box):
+    """Return a room centroid's 3x3 Mandala zone in true compass directions (north at the
+    top, east at right when the building is not rotated)."""
+    off = compass_offset(room, box)
+    if off is None:
+        return None
+    u, v = off
+    col = 0 if u < -1 / 3 else (2 if u >= 1 / 3 else 1)
+    row = 0 if v > 1 / 3 else (2 if v <= -1 / 3 else 1)
     return (
         ("NW", "N", "NE"),
         ("W", "CENTER", "E"),

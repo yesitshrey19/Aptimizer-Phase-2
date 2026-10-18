@@ -157,17 +157,20 @@ def plan_carpet(rooms: Sequence[Dict[str, Any]]) -> float:
     return round(sum(r["w"] * r["h"] for r in rooms if r["type"] not in NOT_CARPET), 2)
 
 
-def _carpet_at(unit_type: str, carpet: float, f: float, level: int) -> float:
+def _carpet_at(unit_type: str, carpet: float, f: float, level: int, front: bool = False) -> float:
     beds, penthouse, _ = _tier(unit_type, carpet)
     w, h, _ = _natural_size(beds, penthouse, f, level)
     rooms, _ = plan_unit({"x": 0.0, "y": 0.0, "w": w, "h": h}, unit_type, carpet, "S", "probe", 0, ["N"],
-                         _sizing=(f, level, None))
+                         _sizing=(f, level, None), pooja_front="hi" if front else None)
     return plan_carpet(rooms)
 
 
 @lru_cache(maxsize=4096)
-def sizing(unit_type: str, carpet: float) -> Tuple[float, int, Any]:
+def sizing(unit_type: str, carpet: float, front: bool = False) -> Tuple[float, int, Any]:
     """(scale, level, warning) that makes the plan's carpet area match `carpet`.
+
+    `front` sizes the variant with the pooja at the facade (see plan_unit), which turns
+    balcony into carpet, for flats whose facade faces north.
 
     The brief scales down until rooms reach their code floors, then the levels above save
     space in order; past the last one the smallest plan is drawn and `warning` says so."""
@@ -179,24 +182,24 @@ def sizing(unit_type: str, carpet: float) -> Tuple[float, int, Any]:
     lo_f, hi_f = SCALE_LIMITS
     label = f"{beds} BHK{' penthouse' if penthouse else ''}"
     for level in levels:
-        smallest = _carpet_at(unit_type, carpet, lo_f, level)
+        smallest = _carpet_at(unit_type, carpet, lo_f, level, front)
         if target < smallest * 0.98 and level != levels[-1]:
             continue
         if target < smallest * 0.98:
             return lo_f, level, (f"{target:.0f} m² carpet is below the smallest {label} plan with every room "
                                  f"at its NBC 2016 minimum ({smallest:.0f} m²); drawn at {smallest:.0f} m².")
-        largest = _carpet_at(unit_type, carpet, hi_f, level)
+        largest = _carpet_at(unit_type, carpet, hi_f, level, front)
         if target > largest * 1.02:
             return hi_f, level, (f"{target:.0f} m² carpet is above the largest {label} plan the brief "
                                  f"scales to ({largest:.0f} m²); drawn at {largest:.0f} m².")
         a, b = lo_f, hi_f              # carpet rises with the scale: smallest f that reaches target
         for _ in range(28):
             m = (a + b) / 2
-            if _carpet_at(unit_type, carpet, m, level) >= target:
+            if _carpet_at(unit_type, carpet, m, level, front) >= target:
                 b = m
             else:
                 a = m
-        lower, upper = _carpet_at(unit_type, carpet, a, level), _carpet_at(unit_type, carpet, b, level)
+        lower, upper = _carpet_at(unit_type, carpet, a, level, front), _carpet_at(unit_type, carpet, b, level, front)
         return (a if abs(lower - target) < abs(upper - target) else b), level, None
     return lo_f, levels[-1], None
 
@@ -205,10 +208,10 @@ def scale_for(unit_type: str, carpet: float) -> float:
     return sizing(unit_type, carpet)[0]
 
 
-def envelope(unit_type: str, carpet: float) -> Tuple[float, float]:
+def envelope(unit_type: str, carpet: float, front: bool = False) -> Tuple[float, float]:
     """(width along the corridor, depth) of the flat this brief produces."""
     beds, penthouse, _ = _tier(unit_type, carpet)
-    f, level, _ = sizing(unit_type, float(carpet or 0))
+    f, level, _ = sizing(unit_type, float(carpet or 0), front)
     w, h, _ = _natural_size(beds, penthouse, f, level)
     return w, h
 
@@ -233,7 +236,8 @@ def _place(rect: Dict[str, float], plan_w: float, plan_h: float, entry_edge: str
 def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: str,
               uid: str, unit_index: int, exterior_edges: Sequence[str],
               mirror: bool = False, master_last: bool = False, split: int = 0,
-              servant_first: bool = False, _sizing=None) -> Tuple[List[Dict[str, Any]], List[str]]:
+              servant_first: bool = False, _sizing=None,
+              pooja_front: Any = None, kitchen_first: bool = False) -> Tuple[List[Dict[str, Any]], List[str]]:
     """Plan one flat inside `box` (normally sized by `envelope`). Returns (rooms, notes).
 
     `mirror` flips the plan end for end; `master_last` puts the master bedroom at the far
@@ -292,7 +296,11 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     order = list(range(len(cols["beds"])))
     if master_last:
         order = order[1:] + order[:1]
-    split = max(0, min(int(split), len(order) - 1)) if len(order) > 1 else 0
+    # Every bedroom may go before the core, a 1 BHK's only one included. A two-row 1 BHK
+    # that does so needs the foyer cell's end for the bedroom lobby, so its shaft moves into
+    # the bedroom's service strip, between the bath and the lobby.
+    split = max(0, min(int(split), len(order)))
+    bed_shaft = two_row and beds == 1 and split == 1
     seq: List[Tuple[str, Any]] = []
     if servant and servant_first:
         seq.append(("servant", None))
@@ -336,16 +344,30 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     # ------------------------------------------------------------ R1: the facade row
     # Utility: a dry balcony on the facade beside the kitchen; the store or pantry behind it.
     ud = round(max(UTILITY_MIN_D, d1 - MAX_STORE_RATIO * uw), 3)
-    emit("utility", "Utility / Dry Balcony", "utility", x_util, 0, uw, ud, door_to="kitchen", has_window=True)
+    # `kitchen_first` swaps the kitchen and its utility column, so the kitchen sits on the
+    # far side from the living room; it moves the kitchen a column along the facade.
+    ux, kx = (x_util + kw, x_util) if kitchen_first else (x_util, x_util + uw)
+    emit("utility", "Utility / Dry Balcony", "utility", ux, 0, uw, ud, door_to="kitchen", has_window=True)
     if big:
-        emit("pantry", "Pantry & Dry Store", "pantry", x_util, ud, uw, d1 - ud, door_to="kitchen")
+        emit("pantry", "Pantry & Dry Store", "pantry", ux, ud, uw, d1 - ud, door_to="kitchen")
     else:
-        emit("store", "Kitchen Store", "storage", x_util, ud, uw, d1 - ud, door_to="kitchen")
-    emit("kitchen", "Kitchen", "kitchen", x_util + uw, 0, kw, d1, has_window=True,
+        emit("store", "Kitchen Store", "storage", ux, ud, uw, d1 - ud, door_to="kitchen")
+    emit("kitchen", "Kitchen", "kitchen", kx, 0, kw, d1, has_window=True,
          door_to="foyer" if two_row else "breakfast",
          hob_faces="East")
-    emit("lbalcony", f"Living {terrace}", "terrace" if penthouse else "balcony", x_living, 0, lw, LIVING_BALCONY,
+    # A flat whose facade faces north can take the pooja at the front, beside the living
+    # balcony (the manual's North fallback), instead of in the service row behind the living
+    # room, which for such a flat is its southern half (a sector the manual forbids).
+    front_pw = POOJA_W[tier] if (pooja_front and level == FULL) else 0.0
+    if front_pw and lw - front_pw < MIN_HAB_W:
+        return [], ["The living room is too narrow to give up its facade to the pooja."]
+    bx = x_living + (front_pw if pooja_front == "lo" else 0.0)
+    emit("lbalcony", f"Living {terrace}", "terrace" if penthouse else "balcony", bx, 0, lw - front_pw, LIVING_BALCONY,
          has_window=True, projects_from=f"{uid}-living")
+    if front_pw:
+        emit("pooja", "Pooja Niche" if tier == 1 else "Pooja Room", "pooja",
+             x_living if pooja_front == "lo" else x_living + lw - front_pw, 0, front_pw, LIVING_BALCONY,
+             door_to="living", faces="East")
     omitted = [] if level == FULL else ["pooja"] + (["breakfast", "passage"] if two_row else [])
     if two_row:
         # Living and dining are one room through both rows; the foyer and lobbies open onto it.
@@ -395,8 +417,8 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         # The breakfast area's place: the entrance foyer, the main door on the corridor wall.
         # A 1 BHK puts the shaft at its outer end beside the kitchen; a 2 BHK needs that end
         # for the first bedroom's lobby and keeps the shaft at the far end of the wing.
-        fx0 = 0.0 if end_shaft else SHAFT_W
-        if not end_shaft:
+        fx0 = 0.0 if (end_shaft or bed_shaft) else SHAFT_W
+        if not (end_shaft or bed_shaft):
             emit("shaft", "MEP Shaft", "shaft", x_util, y2, SHAFT_W, d2, has_window=False)
         emit("foyer", "Entrance Foyer", "entrance", x_util + fx0, y2, uw + kw - fx0, d2,
              door_to="living", main_entrance=True, entry_edge=entry_edge)
@@ -418,7 +440,11 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         emit("dining", "Dining", "dining", x_living, y2, dining_w, d2, has_window=False, door_to="living")
     # Pooja at the far end of the living room from the kitchen: its other neighbour is a
     # lounge or a lobby, never a bath.
-    if pw:
+    if pw and front_pw:
+        # The pooja went to the facade; its service-row cell stays a cabinet, so the dining
+        # room keeps the proportions it has in the standard layout.
+        emit("sideboard", "Crockery & Bar", "storage", x_living + lw - pw, y2, pw, d2, door_to="dining")
+    elif pw:
         emit("pooja", "Pooja Niche" if tier == 1 else "Pooja Room", "pooja", x_living + lw - pw, y2, pw, d2,
              door_to="living", faces="East")
     if x_office is not None:
@@ -449,6 +475,11 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         # touches, so no bath ever shares a wall with the pooja room. Without the passage
         # row, a bedroom before the core turns its lobby to the core side instead.
         pre_core = two_row and bx < x_util
+        if pre_core and bed_shaft:
+            slot = round(bw - lobby_w - SHAFT_W, 3)
+            if slot < MIN_BATH_W or slot * d2 < MIN_BATH_AREA - 1e-6:
+                return [], ["The bedroom is too narrow to carry the shaft beside its bath."]
+            emit("shaft", "MEP Shaft", "shaft", bx + slot, y2, SHAFT_W, d2, has_window=False)
         lobby_x = bx + bw - lobby_w if pre_core else bx
         emit(f"{key}lobby", f"{name} Lobby", "passage", lobby_x, y2, lobby_w, d2,
              door_to=("foyer" if pre_core else "living") if two_row else "passage")
@@ -514,27 +545,35 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
     return rooms, notes
 
 
-def variants(unit_type: str, carpet: float) -> List[Tuple[str, Any]]:
+def variants(unit_type: str, carpet: float, front: bool = False) -> List[Tuple[str, Any]]:
     """Every arrangement worth trying for this brief, as (label, planner) pairs with the
-    planner signature the floor-plate generator calls."""
+    planner signature the floor-plate generator calls. `front` (a facade facing north)
+    adds the pooja-at-the-facade arrangements; every variant is sized the same way, so all
+    of them fit the one envelope the row was given."""
     beds, penthouse, prog = _tier(unit_type, carpet)
+    size = sizing(unit_type, float(carpet or 0), front)
     servant = bool(prog.get("servant"))
-    splits = range(0, min(beds - 1, 2) + 1) if beds >= 3 else (0,)
+    splits = range(0, min(beds - 1, 2) + 1) if beds >= 3 else (0, 1)
     out = []
     for mirror in (False, True):
         for master_last in ((False, True) if beds > 1 else (False,)):
             for split in splits:
                 for servant_first in ((False, True) if servant else (False,)):
-                    label = "realistic planner" + "".join(
-                        tag for on, tag in ((mirror, " / mirrored"), (master_last, " / master last"),
-                                            (split, f" / {split} bed(s) before core"),
-                                            (servant_first, " / servant first")) if on)
+                    for side in ((None, "hi", "lo") if front else (None,)):
+                        for kfirst in (False, True):
+                            label = "realistic planner" + "".join(
+                                tag for on, tag in ((mirror, " / mirrored"), (master_last, " / master last"),
+                                                    (split, f" / {split} bed(s) before core"),
+                                                    (servant_first, " / servant first"),
+                                                    (side, " / pooja at the facade"),
+                                                    (kfirst, " / kitchen outboard")) if on)
 
-                    def planner(box, ut, c, entry, uid, idx, ext, _m=mirror, _ml=master_last,
-                                _s=split, _sf=servant_first):
-                        return plan_unit(box, ut, c, entry, uid, idx, ext, mirror=_m, master_last=_ml,
-                                         split=_s, servant_first=_sf)
-                    out.append((label, planner))
+                            def planner(box, ut, c, entry, uid, idx, ext, _m=mirror, _ml=master_last,
+                                        _s=split, _sf=servant_first, _side=side, _kf=kfirst):
+                                return plan_unit(box, ut, c, entry, uid, idx, ext, mirror=_m, master_last=_ml,
+                                                 split=_s, servant_first=_sf, _sizing=size, pooja_front=_side,
+                                                 kitchen_first=_kf)
+                            out.append((label, planner))
     return out
 
 

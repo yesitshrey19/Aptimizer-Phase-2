@@ -136,7 +136,8 @@ def _unit_spec(unit_type: str, carpet: float) -> Dict[str, Any]:
 
 def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floors: int = 1,
                         boxes: Optional[Dict[str, Any]] = None,
-                        meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                        meta: Optional[Dict[str, Any]] = None,
+                        rotation_deg: float = 0.0) -> Dict[str, Any]:
     """What the plan actually achieves against the manual, stated as found.
 
     Two lists, never merged. `violations` are hard rules broken — a balcony off an internal
@@ -163,11 +164,13 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
 
     unit_audits: Dict[str, Any] = {}
     all_violations: List[str] = []
-    anchor_tally = {"pooja": [0, 0], "kitchen": [0, 0], "master": [0, 0]}   # [met, placed]
+    anchor_tally = {k: {"ideal": 0, "acceptable": 0, "missed": 0, "forbidden": 0, "placed": 0}
+                    for k in ("pooja", "kitchen", "master")}
     total_score = 0.0
 
     for uid, urooms in units_rooms.items():
-        box = boxes.get(uid) or _bounding_box(urooms)
+        box = dict(boxes.get(uid) or _bounding_box(urooms))
+        box.setdefault("rot_deg", rotation_deg)
         info = meta.get(uid, {})
         entrance = next((r for r in urooms if r.get("main_entrance")), None)
         entry = (info.get("entry_edge") or (entrance or {}).get("entry_edge") or "S").upper()
@@ -182,14 +185,18 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
         mandala = audit_room_zones(urooms, box)
         for key, rep in sectors.items():
             if rep.get("placed"):
-                anchor_tally[key][1] += 1
-                if rep.get("met"):
-                    anchor_tally[key][0] += 1
+                anchor_tally[key]["placed"] += 1
+                anchor_tally[key][rep["grade"]] += 1
+                # The manual's "never" sectors are a breach, not a missed preference.
+                if rep["grade"] == "forbidden":
+                    hard["violations"].append(f"{key} is in {rep['sector']}, a sector the manual forbids")
 
         # Score is the share of the manual's rules this flat actually meets: hard rules
         # carry three quarters of it because a broken one is a defect, not a preference.
+        # An anchor in the manual's fallback sector earns half.
         placed = [k for k, r in sectors.items() if r.get("placed")]
-        anchor_share = (sum(1 for k in placed if sectors[k].get("met")) / len(placed)) if placed else 1.0
+        credit = {"ideal": 1.0, "acceptable": 0.5}
+        anchor_share = (sum(credit.get(sectors[k]["grade"], 0.0) for k in placed) / len(placed)) if placed else 1.0
         guide_rooms = [r for r in mandala["placements"] if r.get("preferred_zones")]
         guide_share = (sum(1 for r in guide_rooms if r.get("met")) / len(guide_rooms)) if guide_rooms else 1.0
         soft = (anchor_share + guide_share) / 2
@@ -202,8 +209,7 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
             "score": score,
             "unit_type": info.get("unit_type"),
             "entry_edge": entry,
-            "facing": {"S": "South facing", "N": "North facing",
-                       "E": "East facing", "W": "West facing"}.get(entry, entry),
+            "facing": _true_facing(entry, box.get("rot_deg") or 0.0),
             "coverage_pct": hard["coverage_pct"],
             "violations": hard["violations"],
             "program_violations": program_violations,
@@ -217,12 +223,11 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
     avg_score = round(total_score / n_units, 1)
 
     def anchor_line(key, label):
-        met, placed = anchor_tally[key]
-        if not placed:
+        t = anchor_tally[key]
+        if not t["placed"]:
             return f"{label}: not in this floor's programme"
-        if met == placed:
-            return f"{label}: in sector in all {placed} flat(s)"
-        return f"{label}: in sector in {met} of {placed} flat(s)"
+        parts = [f"{t[g]} {g}" for g in ("ideal", "acceptable", "missed", "forbidden") if t[g]]
+        return f"{label}: {', '.join(parts)} of {t['placed']} flat(s)"
 
     is_penthouse_tier = (
         (total_floors >= 8 and floor == total_floors)
@@ -253,8 +258,24 @@ def audit_vastu_and_mep(rooms: List[Dict[str, Any]], floor: int = 1, total_floor
                                   if not any("passage or foyer" in v for v in all_violations)
                                   else "a bedroom has no transitional space to open onto"),
         },
+        "anchor_grades": anchor_tally,
+        "rotation_deg": rotation_deg,
         "unit_audits": unit_audits,
     }
+
+
+_EDGE_VECTORS = {"N": (0.0, 1.0), "S": (0.0, -1.0), "E": (1.0, 0.0), "W": (-1.0, 0.0)}
+_COMPASS_8 = ("North", "North-East", "East", "South-East", "South", "South-West", "West", "North-West")
+
+
+def _true_facing(entry_edge: str, rotation_deg: float) -> str:
+    """The compass direction of the wall a flat is entered from, after the building's
+    rotation on site (the manual's entrance matrix is keyed by this)."""
+    u, v = _EDGE_VECTORS.get(entry_edge, (0.0, -1.0))
+    rot = math.radians(rotation_deg or 0.0)
+    u, v = u * math.cos(rot) - v * math.sin(rot), u * math.sin(rot) + v * math.cos(rot)
+    bearing = math.degrees(math.atan2(u, v)) % 360
+    return f"{_COMPASS_8[int((bearing + 22.5) // 45) % 8]} facing"
 
 
 def _bounding_box(rooms: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -482,17 +503,27 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
         expanded_units = [{"type": "2bhk", "carpet": 85.0}, {"type": "3bhk", "carpet": 115.0}]
 
     corridor_w = max(float(tower.get("corridor_width") or 2.0), 1.8)
+    # How far the building's plan-east axis is turned from true east on site; every
+    # Vastu sector below is judged in true compass directions.
+    rotation = float(tower.get("plan_rotation_deg") or 0.0)
     n = len(expanded_units)
     north_units = expanded_units[:(n + 1) // 2]
     south_units = expanded_units[(n + 1) // 2:]
 
-    def dims(u):
+    # Does a row's facade (the wall opposite its corridor entry) face north on site? Those
+    # flats get the pooja-at-the-facade arrangements, and are sized for them.
+    def facade_faces_north(is_north):
+        v = 1.0 if is_north else -1.0
+        return math.cos(math.radians(rotation)) * v > 0.05
+    front_north, front_south = facade_faces_north(True), facade_faces_north(False)
+
+    def dims(u, front):
         # The flat's envelope is what its room brief adds up to (see unit_planner), so no
         # planner has to stretch rooms to fill a box sized by a square root of the area.
-        return unit_planner.envelope(u["type"], u["carpet"])
+        return unit_planner.envelope(u["type"], u["carpet"], front)
 
-    north_dims = [dims(u) for u in north_units]
-    south_dims = [dims(u) for u in south_units]
+    north_dims = [dims(u, front_north) for u in north_units]
+    south_dims = [dims(u, front_south) for u in south_units]
     north_h = max([h for _, h in north_dims], default=0.0)
     south_h = max([h for _, h in south_dims], default=0.0)
     corridor_y = north_h
@@ -515,14 +546,14 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
         for idx, (u, (uw, uh)) in enumerate(zip(units, dimensions)):
             uid = f"unit-{'N' if is_north else 'S'}{idx + 1}"
             box_y = (corridor_y - uh) if is_north else (corridor_y + corridor_w)
-            box = {"x": round(cursor, 2), "y": round(box_y, 2), "w": uw, "h": uh}
+            box = {"x": round(cursor, 2), "y": round(box_y, 2), "w": uw, "h": uh, "rot_deg": rotation}
             exterior = ["N"] if is_north else ["S"]
             if idx == 0:
                 exterior.append("W")
             if idx == last:
                 exterior.append("E")
             candidates = []
-            planners = tuple(unit_planner.variants(u["type"], u["carpet"])) + (
+            planners = tuple(unit_planner.variants(u["type"], u["carpet"], front_north if is_north else front_south)) + (
                 ("room planner", generate_realistic_unit),
                 ("Vastu guide packer", vastu.pack_unit),
             )
@@ -547,6 +578,10 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
                         1 for report in anchors.values()
                         if report.get("placed") and not report.get("met")
                     )
+                    anchor_forbidden = sum(1 for report in anchors.values()
+                                           if report.get("grade") == "forbidden")
+                    anchor_fallbacks = sum(1 for report in anchors.values()
+                                           if report.get("grade") == "acceptable")
                     expected_beds = vastu.unit_programme(u["type"], u["carpet"])["beds"]
                     actual_beds = sum(1 for room in candidate if room.get("type") == "bedroom")
                     bedroom_misses = abs(expected_beds - actual_beds)
@@ -556,6 +591,10 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
                         len(unit_planner.livability_defects(candidate)),
                         len(hard["violations"]),
                         len(program_violations),
+                        # The manual's "never" sectors (pooja S/SW, master NE) rank with the
+                        # hard rules: a plan that avoids them beats one that does not, before
+                        # the preference for the realistic planner.
+                        anchor_forbidden,
                         # A rule-clean realistic plan wins; the soft Vastu placements below
                         # only choose between its two mirror images.
                         0 if source.startswith("realistic planner") else 1,
@@ -565,7 +604,7 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
                         len(zones.get("violations") or []) + sum(
                             1 for room in candidate
                             if str(room.get("id", "")).endswith("-mbed") and vastu.sector_of(room, box) == "NE"),
-                        anchor_misses,          # the guide's primary anchors: kitchen SE, master SW, pooja NE
+                        anchor_misses - anchor_fallbacks / 2,   # primary anchors; the manual's fallback sectors count half
                         zones["preference_misses"],
                         bedroom_misses,
                         planner_order,
@@ -601,7 +640,7 @@ def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[
     })
 
     validation = {"vastu": audit_vastu_and_mep(rooms, floor, total_floors,
-                                               boxes=unit_boxes, meta=unit_meta)}
+                                               boxes=unit_boxes, meta=unit_meta, rotation_deg=rotation)}
     # Flats whose entered carpet area no plan with NBC-sized rooms can match.
     warnings = {unit_planner.sizing(u["type"], u["carpet"])[2] for u in expanded_units}
     validation["size_warnings"] = sorted(w for w in warnings if w)

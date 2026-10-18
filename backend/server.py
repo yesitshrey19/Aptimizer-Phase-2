@@ -820,7 +820,8 @@ async def floor_layout(project_id: str, tower_id: str, body: FloorLayoutIn,
     else:
         nonce = (int(existing.get("seed", -1)) + 1) if (existing and body.regenerate) else 0
         entry = floor_layout_entry(tower, body.floor, nonce)
-        vastu_audit = aifloorplan.audit_vastu_and_mep(entry["rooms"], body.floor, max(int(tower.get("floors") or 1), 1))
+        vastu_audit = aifloorplan.audit_vastu_and_mep(entry["rooms"], body.floor, max(int(tower.get("floors") or 1), 1),
+                                                      rotation_deg=float(tower.get("plan_rotation_deg") or 0.0))
         entry["validation"] = {**(entry.get("validation") or {}), "vastu": vastu_audit}
 
     tower["floor_layouts"][key] = entry

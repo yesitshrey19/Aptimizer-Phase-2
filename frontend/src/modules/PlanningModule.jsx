@@ -1191,12 +1191,16 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
 
                   <div className="space-y-1 text-[11px] text-slate-600">
                     {(() => {
-                      // Each row reports what the audit found on this floor, flat by flat;
-                      // a tick only when every flat that has the room meets its sector.
+                      // Each row reports what the audit found on this floor, flat by flat, graded
+                      // by the Vastu manual: ideal sector, the manual's fallback, missed, or a
+                      // sector it forbids. Tick only when every flat is ideal or fallback.
                       const audits = Object.values(vastu.unit_audits || {});
                       const tally = (key) => {
                         const placed = audits.filter((a) => a.anchors?.[key]?.placed);
-                        return { met: placed.filter((a) => a.anchors[key].met).length, placed: placed.length };
+                        const grade = (a) => a.anchors[key].grade || (a.anchors[key].met ? "ideal" : "missed");
+                        const count = (g) => placed.filter((a) => grade(a) === g).length;
+                        return { met: count("ideal") + count("acceptable"), placed: placed.length,
+                                 ideal: count("ideal"), fallback: count("acceptable"), forbidden: count("forbidden") };
                       };
                       const unitIds = [...new Set(floorRooms.map((r) => r.unit_id).filter(Boolean))];
                       const withShaft = unitIds.filter((u) => floorRooms.some((r) => r.unit_id === u && r.type === "shaft"));
@@ -1208,7 +1212,7 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
                       ];
                       return rows.map((row, i) => {
                         const all = row.placed > 0 && row.met === row.placed;
-                        const none = row.placed > 0 && row.met === 0;
+                        const none = row.placed > 0 && (row.met === 0 || row.forbidden > 0);
                         const Icon = all ? CheckCircle2 : none ? XCircle : AlertTriangle;
                         const tone = row.placed === 0 ? "text-slate-400" : all ? "text-emerald-700" : none ? "text-red-700" : "text-amber-700";
                         return (
@@ -1217,7 +1221,14 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
                             <span className="font-mono text-slate-500">{row.zone}</span>
                             <span className={`font-medium flex items-center gap-1 ${tone}`}>
                               {row.placed > 0 && <Icon className="h-3 w-3" />}
-                              {row.label} · {row.placed === 0 ? "not in these flats" : `${row.met} of ${row.placed} flat${row.placed === 1 ? "" : "s"}`}
+                              {row.label} · {(() => {
+                                if (row.placed === 0) return "not in these flats";
+                                const flats = `${row.placed} flat${row.placed === 1 ? "" : "s"}`;
+                                if (row.ideal === undefined) return `${row.met} of ${flats}`;
+                                const parts = [row.ideal && `${row.ideal} ideal`, row.fallback && `${row.fallback} fallback`,
+                                               row.forbidden && `${row.forbidden} forbidden`].filter(Boolean);
+                                return parts.length ? `${parts.join(" · ")} of ${flats}` : `0 of ${flats}`;
+                              })()}
                             </span>
                           </div>
                         );

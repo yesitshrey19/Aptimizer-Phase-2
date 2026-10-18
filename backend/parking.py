@@ -51,9 +51,23 @@ STATE_NORMS: Dict[str, Dict[str, Any]] = {
         "visitor_pct": 10.0, "verified": False,
     },
     "Karnataka": {
-        "authority": "Karnataka / BBMP zoning regulations -- approx. 1 ECS per 100 m2 built-up",
-        "basis": "builtup_per_100", "ecs_per_100_sqm": 1.0, "scooters_per_unit": 1.0,
-        "visitor_pct": 10.0, "verified": False,
+        # Bengaluru RMP-2015 Zoning Regulations, Table 23 item 13 (multi-dwelling units),
+        # p. 48: 1 car per dwelling unit of 50-150 m2, 1 car per 2 units below 50 m2, and
+        # 10% for visitors. Above 150 m2 the table adds a car for each part beyond 50% of
+        # the 150 m2 limit; the approved BBMP plans checked in Phase II (Sterling Infinia,
+        # Legacy Cataleya) apply that as 2 cars above 150 m2 and 3 above 375 m2, so the
+        # bands follow that practice. Upper bounds are inclusive ("up to 150 sq.m").
+        # Table 23 sets no two-wheeler requirement for residential units.
+        "authority": "Bengaluru RMP-2015 Zoning Regulations, Table 23 item 13 (multi-dwelling units)",
+        "basis": "carpet_band",
+        "bands": [(0.0, 50.0, 0.5, 0.0), (50.0, 150.0 + 1e-9, 1.0, 0.0),
+                  (150.0 + 1e-9, 375.0 + 1e-9, 2.0, 0.0), (375.0 + 1e-9, 525.0 + 1e-9, 3.0, 0.0),
+                  (525.0 + 1e-9, 675.0 + 1e-9, 4.0, 0.0), (675.0 + 1e-9, INF, 5.0, 0.0)],
+        "visitor_pct": 10.0,
+        "visitor_additional": True,      # Table 23 13(C): "10% of additional parking"
+        "verified": True,
+        "note": "Unit area per dwelling (the table says 'floor area' of the unit). Club houses and "
+                "commercial floor area carry their own Table 23 rates and are not included here.",
     },
     "Telangana": {
         "authority": "Telangana / GHMC building rules -- approx. 1 ECS per 100 m2 built-up",
@@ -244,7 +258,14 @@ def plan(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
                         else (norm["visitor_pct"] if norm.get("visitor_pct") is not None else 10.0))
     ev_pct = float(p.get("ev_pct") if p.get("ev_pct") is not None else DEFAULT_EV_PCT)
     accessible_pct = p.get("accessible_pct")
-    visitor_required = math.ceil(required * visitor_pct / 100.0)
+    if norm.get("visitor_additional"):
+        # The rule adds visitor parking ON TOP of the units' requirement, and the approved
+        # plans round it to the nearest car (422 -> +42, 76 -> +8), so it is added here and
+        # the site total includes it.
+        visitor_required = int(required * visitor_pct / 100.0 + 0.5)
+        required += visitor_required
+    else:
+        visitor_required = math.ceil(required * visitor_pct / 100.0)
     ev_required = math.ceil(required * ev_pct / 100.0)
     accessible_required = (math.ceil(required * float(accessible_pct) / 100.0)
                            if accessible_pct is not None else math.ceil(required / ACCESSIBLE_PER))

@@ -203,3 +203,56 @@ def test_a_scheme_designed_exactly_at_far_3_passes_despite_float_noise():
 def test_a_real_excess_over_far_3_still_fails():
     r = plot_row("T4")                                   # FAR 3.01
     assert r["app"] == "Fail"
+
+
+# ----------------------------------------------------------------------- parking, M1-M5 and RERA
+# RMP-2015 Table 23 item 13, worked by hand: 1 car per unit of 50-150 m2, 1 per 2 units
+# below 50 m2, 2 above 150 m2 and 3 above 375 m2 (as the approved BBMP plans apply it),
+# plus 10% visitors on top rounded to the nearest car. (units per floor, unit area) over
+# 10 floors; the expected totals below were worked out by hand from that rule.
+PARKING_MIXES = {
+    "M1": ([(4, 65.0), (2, 95.0)], 66),      # 60 x 1 = 60, +6
+    "M2": ([(3, 45.0), (3, 65.0)], 50),      # 30 x 0.5 + 30 x 1 = 45, +5
+    "M3": ([(2, 240.0), (2, 95.0)], 66),     # 20 x 2 + 20 x 1 = 60, +6
+    "M4": ([(4, 35.0)], 22),                 # 40 x 0.5 = 20, +2
+    "M5": ([(1, 350.0), (1, 420.0)], 55),    # 10 x 2 + 10 x 3 = 50, +5
+}
+
+
+def _parking_tower(name, floors, units):
+    return {"id": name, "name": name, "floors": floors, "footprint_area": 500.0,
+            "units": [{"id": f"{name}{i}", "type": "custom", "count": c, "carpet_area": a,
+                       "balcony_area": 0} for i, (c, a) in enumerate(units)]}
+
+
+def parking_required(towers, plot=(100.0, 100.0)):
+    p = default_project("Parking test", "C", "Bengaluru", "S", "o")
+    p["plot"] = {"length": plot[0], "width": plot[1]}
+    p["towers"] = towers
+    p.pop("site_layout", None)
+    return engine.analyse(p)["parking"]["required_slots"]
+
+
+@pytest.mark.parametrize("key", list(PARKING_MIXES))
+def test_parking_matches_rmp_2015_table_23(key):
+    units, expected = PARKING_MIXES[key]
+    assert parking_required([_parking_tower(key, 10, units)]) == expected
+
+
+# The approved plans' own REQUIRED figures (sanction drawings). P3's 84 also carries 16 cars
+# for an 812 m2 clubhouse (Table 23 item 16), which the app does not model, so its flats-only
+# figure 60 + 6 = 66 is what the app can be held to.
+RERA_PARKING = {
+    "P4": ([("A", 13, [(3, 238.56)]), ("B", 13, [(1, 238.56), (2, 176.85)]),
+            ("C", 14, [(2, 96.33), (2, 101.06)]), ("D", 14, [(2, 96.33), (2, 101.06)]),
+            ("E", 14, [(3, 140.77)]), ("F", 14, [(4, 140.77)]), ("G", 14, [(2, 140.77), (2, 96.33)])],
+           (190.519, 100.0), 464),
+    "P2": ([("A", 4, [(35, 87.6)])], (122.4077, 100.0), 154),
+    "P3": ([("A", 12, [(1, 340.0), (1, 410.0)])], (61.708, 50.0), 66),
+}
+
+
+@pytest.mark.parametrize("key", list(RERA_PARKING))
+def test_parking_matches_the_approved_bbmp_plans(key):
+    towers, plot, expected = RERA_PARKING[key]
+    assert parking_required([_parking_tower(*t) for t in towers], plot) == expected

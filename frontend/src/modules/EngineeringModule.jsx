@@ -52,7 +52,10 @@ const INPUTS = {
     ["aisle_width_m", "Aisle width", "m", 0.1],
     ["two_wheeler_provided", "Two-wheeler spaces provided", "nos", 5],
   ],
-  fire: [["refuge_floors_provided", "Refuge areas provided", "nos", 1]],
+  fire: [
+    ["refuge_floors_provided", "Refuge areas provided", "nos", 1],
+    ["extinguishers_per_floor", "Extinguishers per floor", "nos", 1],
+  ],
   accessibility: [
     ["pedestrian_ramp_slope", "Pedestrian ramp slope", "%", 0.1],
     ["door_width_mm", "Clear door width", "mm", 10],

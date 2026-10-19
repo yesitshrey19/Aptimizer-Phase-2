@@ -299,7 +299,7 @@ def _tower_loads(t, e, city, factored_raw, trib, dead, live, pd):
         "column_load_kn": col,
         "column_size_mm": _column_size(col_raw, float(e["concrete_grade"]), float(e["steel_grade"]),
                                        float(e["column_steel_pct"])),
-        "k2": k2, "design_pressure_kn_sqm": pd_t,
+        "k2": k2, "pz_kn_sqm": round(pz_t_raw, 3), "design_pressure_kn_sqm": pd_t,
         "cf": cf_t,
         "wind_force_kn": round(cf_t * face * t["height_m"] * pd_t_raw, 1),
     }
@@ -481,7 +481,7 @@ def _tower_seismic(t, z, soil_type, r, imp, sa_g, loads, frame_type="brick_infil
     levels = storey_levels(t["floors"], t.get("floor_height") or 3.0, t.get("ground_floor_height"))
     forces = storey_forces(vb_raw, weights, levels)
     return {"id": t["id"], "name": t["name"], "floors": t["floors"], "height_m": t["height_m"],
-            "period_s": ta, "sa_g": sa, "ah": ah, "seismic_weight_kn": w,
+            "period_s": ta, "sa_g": sa, "importance": imp, "ah": ah, "seismic_weight_kn": w,
             "base_shear_kn": round(vb_raw, 1), "base_shear_pct_w": round(ah_raw * 100, 2),
             # Cl. 7.6.3, roof first so the table reads top-down like the code's own examples.
             "storey_forces": [{"level": i + 1, "height_m": round(lv, 2), "weight_kn": round(wt, 1),

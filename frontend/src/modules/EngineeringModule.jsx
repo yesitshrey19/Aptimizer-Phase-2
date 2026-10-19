@@ -417,7 +417,12 @@ export default function EngineeringModule({ project, analysis, update, readOnly,
                   <TableHead className="text-right">Height (m)</TableHead>
                   <TableHead className="text-right">Column load (kN)</TableHead>
                   <TableHead className="text-right">Column size</TableHead>
+                  <TableHead className="text-right">k2</TableHead>
+                  <TableHead className="text-right">pz (kN/m²)</TableHead>
                   <TableHead className="text-right">Wind force (kN)</TableHead>
+                  <TableHead className="text-right">Ta (s)</TableHead>
+                  <TableHead className="text-right">I</TableHead>
+                  <TableHead className="text-right">Ah</TableHead>
                   <TableHead className="text-right">Seismic weight (kN)</TableHead>
                   <TableHead className="text-right">Base shear (kN)</TableHead>
                   <TableHead className="text-right">Base shear (% W)</TableHead>
@@ -431,7 +436,12 @@ export default function EngineeringModule({ project, analysis, update, readOnly,
                     <TableCell className="py-1.5 text-right font-mono">{num(t.loads.height_m, 1)}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{num(t.loads.column_load_kn, 1)}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{t.loads.column_size_mm}</TableCell>
+                    <TableCell className="py-1.5 text-right font-mono">{num(t.loads.k2, 3)}</TableCell>
+                    <TableCell className="py-1.5 text-right font-mono">{t.loads.pz_kn_sqm != null ? num(t.loads.pz_kn_sqm, 3) : "—"}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{num(t.loads.wind_force_kn, 1)}</TableCell>
+                    <TableCell className="py-1.5 text-right font-mono">{t.seismic ? num(t.seismic.period_s, 3) : "—"}</TableCell>
+                    <TableCell className="py-1.5 text-right font-mono">{t.seismic?.importance != null ? num(t.seismic.importance, 1) : "—"}</TableCell>
+                    <TableCell className="py-1.5 text-right font-mono">{t.seismic ? num(t.seismic.ah, 4) : "—"}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{t.seismic ? num(t.seismic.seismic_weight_kn, 1) : "—"}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{t.seismic ? num(t.seismic.base_shear_kn, 1) : "—"}</TableCell>
                     <TableCell className="py-1.5 text-right font-mono">{t.seismic ? `${num(t.seismic.base_shear_pct_w, 2)}%` : "—"}</TableCell>

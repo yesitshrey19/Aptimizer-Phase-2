@@ -165,6 +165,8 @@ async def health_check():
     return {
         "status": "ok" if db_status == "healthy" else "degraded",
         "database": db_status,
+        # Render sets RENDER_GIT_COMMIT for every deploy: says which code is live.
+        "commit": (os.environ.get("RENDER_GIT_COMMIT") or "")[:7] or None,
         "timestamp": now_iso(),
     }
 

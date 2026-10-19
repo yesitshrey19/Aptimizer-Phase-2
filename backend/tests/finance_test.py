@@ -113,3 +113,20 @@ def test_config_round_trips_and_ignores_junk(base):
     assert r["config"]["sale_rate_per_sqft"] == 7000.0
     assert "nonsense" not in r["config"]
     assert r["config"]["land_cost"] == 0.0
+
+
+def test_construction_contingency_is_counted_once_in_the_boq(base):
+    """Phase II fix 2. The BOQ grand total already carries the 5% construction contingency,
+    and finance takes that total as its construction cost -- so finance adds none by
+    default. Its own field is for an extra, developer-level allowance only."""
+    _, a, r = base
+    boq_adders = [x["key"] for x in a["boq"]["adders"]]
+    assert boq_adders.count("contingency_pct") == 1
+    assert r["cost"]["construction"] == pytest.approx(a["cost"]["total"])
+    assert r["cost"]["contingency"] == 0
+
+
+def test_an_explicit_developer_contingency_is_still_honoured(base):
+    p, a, _ = base
+    r = F.analyse(p, a, {"sale_rate_per_sqft": 6500, "contingency_pct": 2.0})
+    assert r["cost"]["contingency"] == pytest.approx(0.02 * r["cost"]["construction"], abs=0.01)

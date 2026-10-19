@@ -12,7 +12,8 @@ import { CalculationNotice } from "../components/CalculationNotice";
 import { Button } from "../components/ui/button";
 
 // Stage 1 (Site) plus the stages added so far. Stage 2 (Design) brings planning, parking,
-// the generative studios, 3D and the BIM/CAD exports.
+// the generative studios, 3D and the BIM/CAD exports; Stage 3 (Engineering) brings the
+// calculations and the IS/NBC engineering checks.
 const GisModule = lazy(() => import("../modules/GisModule"));
 const TownshipModule = lazy(() => import("../modules/TownshipModule"));
 const SiteReportsModule = lazy(() => import("../modules/SiteReportsModule"));
@@ -22,11 +23,14 @@ const ParkingModule = lazy(() => import("../modules/ParkingModule"));
 const GenerativeStudioModule = lazy(() => import("../modules/GenerativeStudioModule"));
 const ThreeDModule = lazy(() => import("../modules/ThreeDModule"));
 const BimModule = lazy(() => import("../modules/BimModule"));
+const CalculationsModule = lazy(() => import("../modules/CalculationsModule"));
+const EngineeringModule = lazy(() => import("../modules/EngineeringModule"));
 
 const COMPONENTS = {
   plot: SiteModule, gis: GisModule, township: TownshipModule, reports: SiteReportsModule,
   planning: PlanningModule, "autonomous-studio": AutonomousStudioModule, parking: ParkingModule,
   studio: GenerativeStudioModule, "3d": ThreeDModule, bim: BimModule,
+  calculations: CalculationsModule, engineering: EngineeringModule,
 };
 const GROUPS = WORKSPACE_CATALOG.map(g => [g.id, g.label, g.modules.map(m => [m.id, m.name, m.icon, COMPONENTS[m.id]])]);
 

@@ -29,6 +29,8 @@ const DESCRIPTIONS = {
   studio: "Apartment planning, AI floor plans, facade, landscape, and parking generation",
   "3d": "Interactive 3D massing model, floor stacking, and structural bays",
   bim: "DXF, DWG, and IFC import/export for AutoCAD and Revit interop",
+  calculations: "Loads, areas, carpet-to-saleable, and derived design quantities",
+  engineering: "Structural member sizing checked against IS and NBC codes",
 };
 
 function ModuleLink({ item, active, onPick, onDone }) {

@@ -53,7 +53,9 @@ def column_section(req_area_mm2: float) -> tuple:
     """(breadth, depth) in mm for a required gross area, rounded to 25 mm sizes."""
     side = max(math.ceil(math.sqrt(max(req_area_mm2, 1.0)) / 25.0) * 25.0, 230.0)
     b = max(230.0 if side <= 300 else round(side * 0.65 / 25) * 25, 230.0)
-    d = max(round(req_area_mm2 / b / 25) * 25, 300.0)
+    # Rounded UP: rounding to the nearest 25 mm could leave the section below the area
+    # the load needs (IS 456 Cl. 39.3).
+    d = max(math.ceil(req_area_mm2 / b / 25) * 25, 300.0)
     return b, d
 
 

@@ -346,8 +346,12 @@ export default function EngineeringModule({ project, analysis, update, readOnly,
                 </SelectContent>
               </Select>
             </div>
-            <NumField label="Occupancy per unit" value={cfgv.occupancy_per_unit} disabled={readOnly}
-              onChange={(v) => setCfg("occupancy_per_unit", v)} testid="eng-occupancy-input" />
+            {/* Population comes from each flat's type (engine.OCCUPANCY_PER_UNIT); a single
+                persons-per-flat box here was never read and changed nothing. */}
+            <div className="space-y-1" data-testid="eng-occupancy-note">
+              <div className="text-[11px] uppercase tracking-wider text-slate-500">Occupancy per flat</div>
+              <div className="text-xs text-slate-700 leading-snug">Studio 2 · 1BHK 3 · 2BHK 4 · 3BHK 5 · 4BHK / penthouse 6 persons</div>
+            </div>
             <NumField label="Roof area (0 = use footprint)" suffix="m²" value={cfgv.roof_area_sqm} disabled={readOnly}
               onChange={(v) => setCfg("roof_area_sqm", v)} testid="eng-roof-area-input" />
             <div className="space-y-1">

@@ -771,6 +771,31 @@ async def sync_towers_from_layout(project_id: str, body: SyncTowersIn = SyncTowe
 
 
 # ---------------------------------------------------------------- per-floor room layout
+# Inputs the floor planner accepts. Each flat tries dozens of arrangements, so a mistyped
+# mix (344 flats on one floor once froze the free server twice) is refused up front.
+MAX_FLATS_PER_FLOOR = 24
+MAX_FLOORS = 60
+CARPET_RANGE_SQM = (15.0, 1000.0)
+
+
+def check_floor_inputs(tower: Dict[str, Any]) -> None:
+    units = tower.get("units") or []
+    per_floor = sum(max(int(u.get("count") or 0), 0) for u in units)
+    if per_floor > MAX_FLATS_PER_FLOOR:
+        raise HTTPException(status_code=422, detail=(
+            f"{per_floor} flats on one floor is more than the planner handles ({MAX_FLATS_PER_FLOOR}). "
+            "Enter the flats PER FLOOR, not for the whole tower."))
+    floors = int(tower.get("floors") or 1)
+    if floors > MAX_FLOORS:
+        raise HTTPException(status_code=422, detail=f"{floors} floors is more than the planner handles ({MAX_FLOORS}).")
+    lo, hi = CARPET_RANGE_SQM
+    for u in units:
+        carpet = float(u.get("carpet_area") or 0)
+        if carpet and not lo <= carpet <= hi:
+            raise HTTPException(status_code=422, detail=(
+                f"A {u.get('type') or 'flat'} of {carpet:g} m² carpet is outside the {lo:g}-{hi:g} m² the planner accepts."))
+
+
 class FloorLayoutIn(BaseModel):
     floor: int
     regenerate: bool = False
@@ -794,6 +819,7 @@ async def floor_layout(project_id: str, tower_id: str, body: FloorLayoutIn,
 
     if body.units is not None:
         tower["units"] = body.units
+    check_floor_inputs(tower)
 
     tower.setdefault("floor_layouts", {})
     key = str(body.floor)
@@ -819,9 +845,11 @@ async def floor_layout(project_id: str, tower_id: str, body: FloorLayoutIn,
         }
     else:
         nonce = (int(existing.get("seed", -1)) + 1) if (existing and body.regenerate) else 0
-        entry = floor_layout_entry(tower, body.floor, nonce)
-        vastu_audit = aifloorplan.audit_vastu_and_mep(entry["rooms"], body.floor, max(int(tower.get("floors") or 1), 1),
-                                                      rotation_deg=float(tower.get("plan_rotation_deg") or 0.0))
+        # CPU-bound: off the event loop, so one big floor does not stall every other request.
+        entry = await run_in_threadpool(floor_layout_entry, tower, body.floor, nonce)
+        vastu_audit = await run_in_threadpool(
+            aifloorplan.audit_vastu_and_mep, entry["rooms"], body.floor, max(int(tower.get("floors") or 1), 1),
+            None, None, float(tower.get("plan_rotation_deg") or 0.0))
         entry["validation"] = {**(entry.get("validation") or {}), "vastu": vastu_audit}
 
     tower["floor_layouts"][key] = entry
@@ -864,6 +892,7 @@ async def generate_all_floors(project_id: str, tower_id: str, body: GenerateAllF
 
     if body.units is not None:
         tower["units"] = body.units
+    check_floor_inputs(tower)
 
     floors = max(int(tower.get("floors") or 1), 1)
     tower.setdefault("floor_layouts", {})
@@ -882,11 +911,12 @@ async def generate_all_floors(project_id: str, tower_id: str, body: GenerateAllF
                 "ai_generated": True,
             }
         else:
-            rooms, validation = aifloorplan.generate_architectural_template(tower, fl)
+            rooms, validation = await run_in_threadpool(aifloorplan.generate_architectural_template, tower, fl)
             entry = {
                 "rooms": rooms,
                 "validation": validation,
                 "seed": fl,
+                "planner_version": aifloorplan.PLANNER_VERSION,   # else the floor reads as stale
                 "unit_mix_hash": current_hash,
                 "generated_at": now_iso(),
                 "ai_generated": False,

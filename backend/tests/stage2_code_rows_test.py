@@ -225,10 +225,14 @@ def _parking_tower(name, floors, units):
                        "balcony_area": 0} for i, (c, a) in enumerate(units)]}
 
 
-def parking_required(towers, plot=(100.0, 100.0)):
+def parking_required(towers, plot=(100.0, 100.0), clubhouse_sqm=0.0):
     p = default_project("Parking test", "C", "Bengaluru", "S", "o")
     p["plot"] = {"length": plot[0], "width": plot[1]}
     p["towers"] = towers
+    # Only the facilities the case states: the hand mixes and P2/P4 have no club house
+    # parking line; P3's approved plan carries its 812.17 m2 club house.
+    p["society_amenities"] = ([{"id": "club", "name": "Clubhouse", "type": "clubhouse", "area": clubhouse_sqm}]
+                              if clubhouse_sqm else [])
     p.pop("site_layout", None)
     return engine.analyse(p)["parking"]["required_slots"]
 
@@ -239,23 +243,22 @@ def test_parking_matches_rmp_2015_table_23(key):
     assert parking_required([_parking_tower(key, 10, units)]) == expected
 
 
-# The approved plans' own REQUIRED figures (sanction drawings). P3's 84 also carries 16 cars
-# for an 812 m2 clubhouse (Table 23 item 16), which the app does not model, so its flats-only
-# figure 60 + 6 = 66 is what the app can be held to.
+# The approved plans' own REQUIRED figures (sanction drawings). P3's 84 carries 16 cars for
+# its 812.17 m2 club house (Table 23 item 16): 60 + 16 = 76, + 10% visitors = 84.
 RERA_PARKING = {
     "P4": ([("A", 13, [(3, 238.56)]), ("B", 13, [(1, 238.56), (2, 176.85)]),
             ("C", 14, [(2, 96.33), (2, 101.06)]), ("D", 14, [(2, 96.33), (2, 101.06)]),
             ("E", 14, [(3, 140.77)]), ("F", 14, [(4, 140.77)]), ("G", 14, [(2, 140.77), (2, 96.33)])],
            (190.519, 100.0), 464),
     "P2": ([("A", 4, [(35, 87.6)])], (122.4077, 100.0), 154),
-    "P3": ([("A", 12, [(1, 340.0), (1, 410.0)])], (61.708, 50.0), 66),
+    "P3": ([("A", 12, [(1, 340.0), (1, 410.0)])], (61.708, 50.0), 84, 812.17),
 }
 
 
 @pytest.mark.parametrize("key", list(RERA_PARKING))
 def test_parking_matches_the_approved_bbmp_plans(key):
-    towers, plot, expected = RERA_PARKING[key]
-    assert parking_required([_parking_tower(*t) for t in towers], plot) == expected
+    towers, plot, expected, *club = RERA_PARKING[key]
+    assert parking_required([_parking_tower(*t) for t in towers], plot, *club) == expected
 
 
 # ------------------------------------------------- NBC 2016 Part 3 room minimums (row S2)

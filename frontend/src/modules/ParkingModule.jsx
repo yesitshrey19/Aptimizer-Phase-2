@@ -179,6 +179,12 @@ export default function ParkingModule({ project, analysis, update, readOnly, pro
             <Metric label="EV required" value={int(r?.ev_required)} testid="parking-ev-required" />
             <Metric label="Accessible required" value={int(r?.accessible_required)} testid="parking-accessible-required" />
           </div>
+          {r?.clubhouse_cars > 0 && (
+            <p className="text-xs text-slate-500 mt-2" data-testid="parking-clubhouse-note">
+              Required spaces include {int(r.clubhouse_cars)} for the {Number(r.clubhouse_sqm).toFixed(0)} m² club house
+              (RMP-2015 Table 23 item 16: 1 car per 50 m²), before the visitors' share.
+            </p>
+          )}
         </Section>
       </div>
 

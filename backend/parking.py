@@ -65,9 +65,13 @@ STATE_NORMS: Dict[str, Dict[str, Any]] = {
                   (525.0 + 1e-9, 675.0 + 1e-9, 4.0, 0.0), (675.0 + 1e-9, INF, 5.0, 0.0)],
         "visitor_pct": 10.0,
         "visitor_additional": True,      # Table 23 13(C): "10% of additional parking"
+        # Table 23 item 16: club house, 1 car per 50 m2 of floor area (the approved Legacy
+        # Cataleya plan: 812.17 m2 / 50 = 16 cars, before the visitors' 10%).
+        "clubhouse_sqm_per_car": 50.0,
         "verified": True,
-        "note": "Unit area per dwelling (the table says 'floor area' of the unit). Club houses and "
-                "commercial floor area carry their own Table 23 rates and are not included here.",
+        "note": "Unit area per dwelling (the table says 'floor area' of the unit); club houses at "
+                "1 car per 50 m2 (item 16). Commercial floor area carries its own rate and is not "
+                "included here.",
     },
     "Telangana": {
         "authority": "Telangana / GHMC building rules -- approx. 1 ECS per 100 m2 built-up",
@@ -250,6 +254,15 @@ def plan(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
 
     required = sum(r["cars_required"] for r in by_tower)
     scooters_required = sum(r["scooters_required"] for r in by_tower)
+
+    # ---- society facilities with their own rate (Karnataka: club house) -----------
+    clubhouse_sqm = sum(float(a.get("area") or 0) for a in (project.get("society_amenities") or [])
+                        if str(a.get("type") or "").lower() == "clubhouse"
+                        or "club" in str(a.get("name") or "").lower())
+    clubhouse_cars = 0
+    if norm.get("clubhouse_sqm_per_car") and clubhouse_sqm > 0:
+        clubhouse_cars = int(clubhouse_sqm / float(norm["clubhouse_sqm_per_car"]) + 0.5)
+        required += clubhouse_cars
     provided = sum(own_supply) + shared_pool
     units = sum(r["units"] for r in by_tower) or int(areas.get("total_units") or 0)
 
@@ -331,6 +344,8 @@ def plan(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
         "deficit": max(required - provided, 0),
         "surplus": max(provided - required, 0),
         "visitor_required": visitor_required,
+        "clubhouse_sqm": round(clubhouse_sqm, 2),
+        "clubhouse_cars": clubhouse_cars,
         "ev_required": ev_required,
         "accessible_required": accessible_required,
         "visitor_provided": visitor_provided,

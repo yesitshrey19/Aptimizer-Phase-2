@@ -517,7 +517,7 @@ def _apply_guide_metadata(rooms: List[Dict[str, Any]], box: Dict[str, Any], entr
 # Bumped whenever the deterministic planner changes what it draws, so stored layouts made by an
 # older planner are reported stale (and offered for regeneration) rather than silently replaced
 # -- a stored layout may carry the user's own room edits.
-PLANNER_VERSION = 2
+PLANNER_VERSION = 3   # 3: carpet-sized plans, real-size kitchens/baths, Vastu by true compass
 
 
 def generate_architectural_template(tower: Dict[str, Any], floor: int) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:

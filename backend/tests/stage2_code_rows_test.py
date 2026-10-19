@@ -557,3 +557,60 @@ def vastu_rule_cases():
 def test_vastu_audit_places_anchor_rooms_as_its_rule_says():
     result = vastu_rule_cases()
     assert result["disagreements"] == []
+
+
+# ----------------------------------- room sizes vs 15 real RERA flats (row S2-079)
+# Real ranges (m2) from 15 brochure flats on the Karnataka RERA site (Provident Park Square,
+# Provident Capella, Shriram Blue, Plumeria at Brigade Meadows), measured by B into
+# Stage2_B_flats and checked against the brochures: one living+dining area per flat, each
+# kitchen, bedroom and toilet. Each real flat is rebuilt in the app at its carpet area, on
+# both sides of the corridor; the pass mark is 90% of app rooms inside the real range.
+REAL_FLATS = [("1bhk", 33.9), ("1bhk", 33.4), ("1bhk", 38.7), ("1bhk", 44.12), ("1bhk", 45.24),
+              ("2bhk", 44.6), ("2bhk", 50.0), ("2bhk", 55.7), ("2bhk", 80.4), ("2bhk", 81.85),
+              ("3bhk", 57.5), ("3bhk", 72.5), ("3bhk", 84.1), ("3bhk", 95.22), ("3bhk", 101.5)]
+REAL_RANGES = {
+    "1bhk": {"living_dining": (13.94, 22.46), "kitchen": (3.34, 8.34), "bedroom": (8.52, 12.57), "toilet": (2.08, 3.59)},
+    "2bhk": {"living_dining": (13.63, 26.09), "kitchen": (4.49, 9.68), "bedroom": (7.44, 13.83), "toilet": (2.78, 3.71)},
+    "3bhk": {"living_dining": (15.34, 28.25), "kitchen": (4.64, 9.91), "bedroom": (6.98, 14.04), "toilet": (3.14, 3.71)},
+}
+
+
+def _app_room_class(room):
+    t, n = room["type"], room["name"].lower()
+    if t == "kitchen":
+        return "kitchen"
+    if t == "bathroom":
+        return "toilet"
+    if t == "bedroom":
+        return "bedroom"
+    if t in ("living", "dining") and "lounge" not in n:
+        return "living_dining"
+    return None
+
+
+def real_range_share():
+    inside, outside = 0, []
+    for i, (unit_type, carpet) in enumerate(REAL_FLATS, 1):
+        tower = {"id": f"real{i}", "floors": 4, "corridor_width": 2.0,
+                 "units": [{"type": unit_type, "count": 2, "carpet_area": carpet}]}
+        rooms, _ = aifloorplan.generate_architectural_template(tower, 2)
+        for uid in ("unit-N1", "unit-S1"):
+            areas = {}
+            for r in rooms:
+                c = r.get("unit_id") == uid and _app_room_class(r)
+                if c:
+                    areas.setdefault(c, []).append(r["w"] * r["h"])
+            areas["living_dining"] = [sum(areas.get("living_dining", []))]
+            for c, vals in areas.items():
+                lo, hi = REAL_RANGES[unit_type][c]
+                for a in vals:
+                    if lo - 1e-6 <= a <= hi + 1e-6:
+                        inside += 1
+                    else:
+                        outside.append(f"flat {i} {uid} {c} {a:.2f} m2 outside {lo}-{hi}")
+    return inside, outside
+
+
+def test_app_room_sizes_fall_in_the_real_flats_range():
+    inside, outside = real_range_share()
+    assert inside / (inside + len(outside)) >= 0.90, outside

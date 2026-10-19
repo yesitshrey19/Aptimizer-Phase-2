@@ -54,7 +54,13 @@ SECONDARY_BALCONY = 1.2     # guide: 1.2-1.5 m
 UTILITY_W = 1.35            # guide: 1.2-1.5 m
 UTILITY_MIN_D = 2.4
 SHAFT_W = 0.9
-STORE_SHAFT_D = 1.0         # a shaft cut from the back of the kitchen store (uw x 1.0 m)
+STORE_SHAFT_D = 1.0
+# Kitchen target areas (m2 at brief scale 1) for 1-5 BHK: an Indian flat's kitchen is a
+# compact working room, not the full depth of the facade row. Behind it the column becomes
+# a store. A bath slot is capped at a typical Indian bath (about 1.5 x 2.4 m).
+KITCHEN_AREA = {1: 6.5, 2: 7.5, 3: 8.5, 4: 10.0, 5: 12.0}
+KITCHEN_MIN_AREA = 6.0
+BATH_MAX_AREA = 3.6         # a shaft cut from the back of the kitchen store (uw x 1.0 m)
 POWDER_W = 1.8
 POOJA_W = {1: 1.1, 2: 1.4, 3: 1.5, 4: 1.6, 5: 1.8}
 BATH_SLOT_W = 2.1           # en-suite / common bath width behind a bedroom
@@ -363,13 +369,39 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         if store_d < 0.6:
             return [], ["The kitchen store is too shallow to give up its back to the shaft."]
         emit("shaft", "MEP Shaft", "shaft", ux, ud + store_d, uw, STORE_SHAFT_D, has_window=False)
-    if big:
-        emit("pantry", "Pantry & Dry Store", "pantry", ux, ud, uw, store_d, door_to="kitchen")
+    # The kitchen takes the facade end of its column, sized to the brief, with a pantry
+    # behind it. Beside the living room it opens off the living room (past the balcony line,
+    # so the wall needs a door's width beyond it). Outboard of its utility it does not touch
+    # the living room: the cell behind the utility becomes a kitchen lobby off the living
+    # room instead of a store, and the kitchen opens onto that.
+    k_area = max(KITCHEN_AREA[tier] * min(f, 1.2) ** 2, KITCHEN_MIN_AREA)
+    if kitchen_first:
+        k_depth = max(k_area / kw, ud + DOOR_W)
+        fits = store_d >= DOOR_W and ud + store_d >= k_depth and d1 - k_depth >= 1.0
     else:
-        emit("store", "Kitchen Store", "storage", ux, ud, uw, store_d, door_to="kitchen")
-    emit("kitchen", "Kitchen", "kitchen", kx, 0, kw, d1, has_window=True,
-         door_to="foyer" if two_row else "breakfast",
+        k_depth = max(k_area / kw, LIVING_BALCONY + DOOR_W)
+        fits = d1 - k_depth >= 1.0
+    kd = round(k_depth, 3) if fits else d1
+    short_kitchen = kd < d1
+    lobby_route = short_kitchen and kitchen_first
+    if lobby_route:
+        emit("klobby", "Kitchen Lobby", "passage", ux, ud, uw, store_d, door_to="living")
+    else:
+        # Behind a short kitchen the store opens off the kitchen pantry beside it, the
+        # neighbour it shares its whole depth with.
+        via = "kstore" if short_kitchen else "kitchen"
+        if big:
+            emit("pantry", "Pantry & Dry Store", "pantry", ux, ud, uw, store_d, door_to=via)
+        else:
+            emit("store", "Kitchen Store", "storage", ux, ud, uw, store_d, door_to=via)
+    emit("kitchen", "Kitchen", "kitchen", kx, 0, kw, kd, has_window=True,
+         door_to=("klobby" if lobby_route else "living") if short_kitchen else ("foyer" if two_row else "breakfast"),
          hob_faces="East")
+    if short_kitchen:
+        if big and lobby_route:
+            emit("pantry", "Pantry & Dry Store", "pantry", kx, kd, kw, d1 - kd, door_to="kitchen")
+        else:
+            emit("kstore", "Kitchen Pantry", "storage", kx, kd, kw, d1 - kd, door_to="kitchen")
     # A flat whose facade faces north can take the pooja at the front, beside the living
     # balcony (the manual's North fallback), instead of in the service row behind the living
     # room, which for such a flat is its southern half (a sector the manual forbids).
@@ -438,7 +470,8 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         emit("foyer", "Entrance Foyer", "entrance", x_util + fx0, y2, uw + kw - fx0, d2,
              door_to="living", main_entrance=True, entry_edge=entry_edge)
     else:
-        emit("breakfast", "Breakfast & Crockery", "dining", x_util, y2, uw + kw, d2, door_to="kitchen")
+        emit("breakfast", "Breakfast & Crockery", "dining", x_util, y2, uw + kw, d2,
+             door_to="dining" if short_kitchen else "kitchen")
     pw = POOJA_W[tier] if level == FULL else 0.0
     excess = (lw - pw) - 2.2 * d2
     if pw and 0 < excess <= 1.2:
@@ -480,7 +513,11 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         if end_shaft and bx > x_util:
             bw = round(bw - SHAFT_W, 3)
             emit("shaft", "MEP Shaft", "shaft", bx + bw, y2, SHAFT_W, d2, has_window=False)
-        slot = round(min(BATH_SLOT_W, bw - MIN_LOBBY_W), 3)
+        # Bath slot: a typical Indian bath at most, never below the NBC minimum. A common bath
+        # ending the flat opens off its bedroom lobby, as the end shaft takes the passage there.
+        cap = max(BATH_MAX_AREA / d2, MIN_BATH_W, MIN_BATH_AREA / d2)
+        last_col = not two_row and abs((bx + bw) - plan_end) < 0.01
+        slot = round(min(BATH_SLOT_W, bw - MIN_LOBBY_W, cap), 3)
         lobby_w = round(bw - slot, 3)
         closet_w = 0.0
         if i == 0 and big and lobby_w - MIN_LOBBY_W >= 1.4:
@@ -509,8 +546,9 @@ def plan_unit(box: Dict[str, float], unit_type: str, carpet: float, entry_edge: 
         elif common > 0:
             common -= 1
             emit(f"{key}cbath", "Common Bathroom", "bathroom", cx, y2, slot, d2,
-                 door_to=f"{key}lobby" if two_row else "passage", has_window=False)
-            passage_doors.append(cx)
+                 door_to=f"{key}lobby" if (two_row or last_col) else "passage", has_window=False)
+            if not last_col:
+                passage_doors.append(cx)
         else:
             emit(f"{key}wardrobe", f"{name} Wardrobe", "closet", cx, y2, slot, d2, door_child_of=key)
     if x_servant is not None:

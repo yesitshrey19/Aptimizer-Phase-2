@@ -216,7 +216,7 @@ def default_project(name, client, location, plot_reference, owner_id, latitude=N
         "labour_rates": {},
         "equipment_rates": {},
         "utility_config": {
-            "lpcd": 135,
+            "lpcd": 150,
             "ug_tank_days": 1.0,
             "oh_tank_hours": 8.0,
             "sewage_factor": 0.8,

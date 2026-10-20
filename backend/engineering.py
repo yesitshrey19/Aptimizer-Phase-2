@@ -700,8 +700,8 @@ def m5_water(project, base, e):
         "warnings": water_warnings,
         "outputs": [
             out("Population", persons, "persons", "water_demand", "per-unit-type occupancy from Apartment Planning"),
-            # Labels carry the per-capita figure actually used: the 135 lpcd total is split
-            # in the 135:45:15 proportions, so no line runs at its nominal table value.
+            # Labels carry the per-capita figure actually used: a user total other than the
+            # IS 1172 150 lpcd is split in the 105:45 proportions of Cl. 4.1.1.
             out(f"Domestic demand @{_lpcd(dom, persons)} lpcd", round(dom), "litre/day", "water_demand"),
             out(f"Flushing demand @{_lpcd(flush, persons)} lpcd", round(flush), "litre/day", "water_demand"),
             out(f"External / gardening @{_lpcd(ext, persons)} lpcd", round(ext), "litre/day", "water_demand"),

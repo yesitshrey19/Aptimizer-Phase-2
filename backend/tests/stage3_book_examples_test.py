@@ -131,3 +131,13 @@ def test_mix_defaults_are_unchanged():
 def test_mix_and_footing_inputs_are_bounded():
     assert T.mix_proportions(25, "moderate", 20, slump_mm=-50, water_reduction_pct=95)["water_l"] == pytest.approx(186 * 0.6, abs=0.1)
     assert T.footing_size(1000.0, 200.0, -20)[0] == 1000.0
+
+
+# ------------------------------------------------------------------ S3-061..063 IS 1172
+def test_water_default_is_is1172_rate_for_a_city_above_one_lakh():
+    """IS 1172:1993 Cl. 4.1 / 4.1.1: 150-200 lpcd with full flushing above 1 lakh people,
+    45 of it for flushing; 135 is for LIG / EWS only."""
+    from defaults import default_project
+    assert sum(C.WATER_LPCD.values()) == 150
+    assert C.WATER_LPCD["flushing"] == 45
+    assert default_project("W", "QA", "Bengaluru", "W-1", "owner")["utility_config"]["lpcd"] == 150

@@ -198,14 +198,14 @@ def test_demand_uses_the_is1172_breakdown():
     base, _ = analyse(project())
     u = base["utilities"]
     total = C.WATER_LPCD["domestic"] + C.WATER_LPCD["flushing"] + C.WATER_LPCD["external"]
-    assert u["lpcd"] == total == 195
+    assert u["lpcd"] == total == 150
     assert round(u["domestic_lpd"] + u["flushing_lpd"] + u["external_lpd"]) == round(u["water_demand_lpd"])
 
 
 def test_user_lpcd_override_scales_the_split_without_breaking_the_total():
-    base, _ = analyse(project(utility_config={"lpcd": 150}))
+    base, _ = analyse(project(utility_config={"lpcd": 180}))
     u = base["utilities"]
-    assert u["lpcd"] == 150
+    assert u["lpcd"] == 180
     assert round(u["domestic_lpd"] + u["flushing_lpd"] + u["external_lpd"]) == round(u["water_demand_lpd"])
     assert u["domestic_lpd"] > u["flushing_lpd"] > u["external_lpd"]
 

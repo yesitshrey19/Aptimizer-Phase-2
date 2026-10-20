@@ -125,7 +125,7 @@ CLAUSES = {
     "mix_cement": {"code": "IS 456:2000", "clause": "Table 5", "topic": "Minimum cement content by exposure"},
     "mix_water": {"code": "IS 10262:2019", "clause": "Table 4", "topic": "Water content for 25–50 mm slump"},
     "mix_ca": {"code": "IS 10262:2019", "clause": "Table 5", "topic": "Coarse aggregate volume (Zone II sand)"},
-    "water_demand": {"code": "IS 1172:1993", "clause": "Cl. 4.1", "topic": "135 lpcd in total, split domestic / flushing / external"},
+    "water_demand": {"code": "IS 1172:1993", "clause": "Cl. 4.1", "topic": "150 lpcd incl. 45 flushing (135 LIG/EWS)"},
     "sewage": {"code": "IS 1172:1993", "clause": "Cl. 5", "topic": "Sewage generation = 80% of water supply"},
     "sump": {"code": "NBC 2016 Part 9", "clause": "Cl. 4.1.2", "topic": "Underground storage — one day demand"},
     "oht": {"code": "NBC 2016 Part 9", "clause": "Cl. 4.1.3", "topic": "Overhead tank — one-third day, min 2 compartments"},
@@ -385,7 +385,11 @@ SG = {"cement": 3.15, "fine": 2.65, "coarse": 2.74, "water": 1.0}
 CEMENT_TYPES = {"OPC 43": 43, "OPC 53": 53, "PPC": 43}
 
 # ---------------------------------------------------------------- IS 1172 / NBC 9
-WATER_LPCD = {"domestic": 135, "flushing": 45, "external": 15}
+# IS 1172:1993 Cl. 4.1 / 4.1.1: 150-200 lpcd for communities above 1 lakh with full
+# flushing (Bengaluru), 45 of it for flushing; 135 is the reduced figure for LIG / EWS
+# housing only. The lower bound is the default; garden and landscape water is not part of
+# the per-capita figure and is left to the user (`external`).
+WATER_LPCD = {"domestic": 105, "flushing": 45, "external": 0}
 SEWAGE_FACTOR = 0.80
 # NBC Part 4 Table 7. The height that triggers all three lives here rather than as a bare
 # 15 in m5_water: it is the single value SP 7:2026 is most reported to move, and a magic
@@ -798,7 +802,7 @@ CODE_LIBRARY = [
     {"id": "is13920", "code": "IS 13920:2016", "topic": "Ductile detailing of RC structures",
      "key_value": "Mandatory for Zone III, IV, V and for all important structures", "clause": "Cl. 1.1"},
     {"id": "is1172", "code": "IS 1172:1993", "topic": "Water supply & drainage requirements",
-     "key_value": "135 lpcd in total (flushing within it, not on top); sewage = 80% of supply", "clause": "Cl. 4.1, 5"},
+     "key_value": "150 lpcd incl. 45 flushing (135 LIG/EWS); sewage 80%", "clause": "Cl. 4.1, 5"},
     {"id": "is10262", "code": "IS 10262:2019", "topic": "Concrete mix proportioning",
      "key_value": "f'ck = fck + 1.65S; water 186 l/m³ for 20 mm agg; CA volume 0.62 (Zone II, w/c 0.50)",
      "clause": "Cl. 4.2, Table 4, Table 5"},

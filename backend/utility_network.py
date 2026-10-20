@@ -79,7 +79,7 @@ def plan_utility_network(project: Dict[str, Any], analysis: Optional[Dict[str, A
     if total_units <= 0:
         total_units = sum(int(t.get("units") or 40) if isinstance(t.get("units"), (int, float)) else 40 for t in towers) or 100
     persons = int(utilities.get("persons") or (total_units * 4.5))
-    lpcd = float((project.get("utility_config") or {}).get("lpcd") or 135.0)
+    lpcd = float((project.get("utility_config") or {}).get("lpcd") or 150.0)
     
     # -------------------------------------------------------------------------
     # 1. GRAVITY SEWER TRUNK NETWORK (IS 1742 / CPHEEO)

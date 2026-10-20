@@ -49,6 +49,21 @@ PCC_THICKNESS_M = 0.10
 
 
 # ---------------------------------------------------------------- member sizing
+FOOTING_SELF_WEIGHT_PCT = 10.0   # footing + backfill, as a share of the column service load
+
+
+def footing_size(service_load_kn: float, sbc_kn_sqm: float, self_weight_pct: float = FOOTING_SELF_WEIGHT_PCT) -> tuple:
+    """(load on soil kN, required area m2, side m) for a square pad, side rounded UP to 50 mm.
+
+    Shared with the engineering module's foundation advisor so the take-off quantities and
+    the advisor size the same footing.
+    """
+    soil_load = service_load_kn * (1 + min(max(float(self_weight_pct or 0.0), 0.0), 50.0) / 100.0)
+    area = soil_load / sbc_kn_sqm if sbc_kn_sqm else 0.0
+    side = round(math.ceil(math.sqrt(area) / 0.05 - 1e-9) * 0.05, 2) if area > 0 else 0.0
+    return soil_load, area, side
+
+
 def column_section(req_area_mm2: float) -> tuple:
     """(breadth, depth) in mm for a required gross area, rounded to 25 mm sizes."""
     side = max(math.ceil(math.sqrt(max(req_area_mm2, 1.0)) / 25.0) * 25.0, 230.0)
@@ -177,11 +192,29 @@ def beam_layout(bay_x: float, bay_y: float, bays_x: int, bays_y: int,
     }
 
 
-def mix_proportions(grade: int, exposure_key: str, agg_mm: int) -> Dict[str, float]:
-    """IS 10262:2019 proportioning -- kg of cement, sand and aggregate per m3."""
+MIX_BASE_SLUMP_MM = 50.0        # IS 10262 Table 4 water contents are for 25-50 mm slump
+MIX_WATER_PER_25MM_SLUMP = 0.03 # +3 % water for every 25 mm of slump above that
+
+
+def mix_proportions(grade: int, exposure_key: str, agg_mm: int, slump_mm: float = MIX_BASE_SLUMP_MM,
+                    water_reduction_pct: float = 0.0, wc_chosen: float = 0.0) -> Dict[str, float]:
+    """IS 10262:2019 proportioning -- kg of cement, sand and aggregate per m3.
+
+    `wc_chosen` is a free w/c ratio picked from experience or trial (IS 10262 Cl. 4.1); it is
+    capped at the IS 456 Table 5 durability limit, which is also the default when none is
+    given. Water is raised 3 % per 25 mm of slump above 50 mm and cut by the water reduction
+    a chemical admixture achieves (Cl. 4.2).
+    """
     exposure = C.EXPOSURE.get(exposure_key, C.EXPOSURE["moderate"])
-    wc = float(exposure["max_wc"])
-    water = float(C.MIX_WATER.get(agg_mm, 186))
+    max_wc = float(exposure["max_wc"])
+    wc = min(float(wc_chosen), max_wc) if wc_chosen and float(wc_chosen) > 0 else max_wc
+    # Bounded so a typo cannot drive the water to zero or negative: slump to the 200 mm of
+    # flowing concrete, and the cut to the 40 % a high-range admixture can reach.
+    extra_slump = min(max(float(slump_mm or MIX_BASE_SLUMP_MM) - MIX_BASE_SLUMP_MM, 0.0), 150.0)
+    reduction = min(max(float(water_reduction_pct or 0.0), 0.0), 40.0)
+    base_water = float(C.MIX_WATER.get(agg_mm, 186))
+    water = round(base_water * (1 + MIX_WATER_PER_25MM_SLUMP * extra_slump / 25.0)
+                  * (1 - reduction / 100.0), 1)
     cement_raw = max(water / wc, float(exposure["min_cement"]))
     cement = max(round(water / wc, 1), exposure["min_cement"])
     if cement_raw > water / wc:
@@ -306,8 +339,8 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
 
         # Footings: service load on one column, spread at the soil's safe bearing capacity.
         col_service = service_per_sqm * trib * floors
-        f_area = col_service / sbc if sbc else 0.0
-        f_side = math.sqrt(f_area) + 0.05 if f_area > 0 else 0.0
+        _, f_area, f_side = footing_size(col_service, sbc,
+                                         e.get("footing_self_weight_pct", FOOTING_SELF_WEIGHT_PCT))
         f_depth = max(f_side / 4.0, FOOTING_DEPTH_MIN_M)
         found_c = f_side * f_side * f_depth * n_col
         pcc_c = (f_side + 0.2) ** 2 * PCC_THICKNESS_M * n_col
@@ -374,7 +407,9 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
         tot["steel_kg"] += steel
         tot["formwork_sqm"] += formwork
 
-    mix = mix_proportions(int(fck), e["exposure_condition"], int(e["aggregate_size_mm"]))
+    mix = mix_proportions(int(fck), e["exposure_condition"], int(e["aggregate_size_mm"]),
+                          e.get("slump_mm", MIX_BASE_SLUMP_MM), e.get("admixture_water_reduction_pct", 0.0),
+                          e.get("wc_chosen", 0.0))
     vol = tot["concrete_m3"]
     builtup = float(areas.get("builtup_area_sqm") or 0)
     cement_kg_raw = mix.get("cement_kg_raw", mix["cement_kg"]) * vol

@@ -71,6 +71,10 @@ DEFAULT_ENGINEERING = {
     "site_area_type": "mixed_site",
     "green_checklist": {},
     "rain_intensity_override": 0,
+    "footing_self_weight_pct": takeofflib.FOOTING_SELF_WEIGHT_PCT,
+    "slump_mm": takeofflib.MIX_BASE_SLUMP_MM,
+    "admixture_water_reduction_pct": 0.0,
+    "wc_chosen": 0.0,                   # 0 -> the IS 456 durability limit
 }
 
 
@@ -502,41 +506,50 @@ def m3_foundation(project, base, e, loads):
     df = round(max(df, 0.5), 2)
 
     service_load_raw = col_load_raw / 1.5
-    req_area_raw = service_load_raw / sbc if sbc else 0.0
+    # The soil carries the footing and the backfill on it as well as the column, so the
+    # area is sized for the column load plus a self-weight allowance, as the solved
+    # examples do (IITK-GSDMA EQ26 takes 15%; 10% is the usual textbook figure).
+    # The side is rounded UP to the next 50 mm, a size that can be set out on site.
+    soil_load_raw, req_area_raw, footing_side = takeofflib.footing_size(
+        service_load_raw, sbc, e.get("footing_self_weight_pct"))
     req_area = round(req_area_raw, 2)
-    footing_side = round(math.sqrt(req_area_raw) + 0.05, 2) if req_area_raw > 0 else 0
     floors = int(b["floors"] or 0)
     poor = e["soil_type"] in ("soft clay",)
 
-    if floors <= 3 and not poor:
-        ftype = "Isolated / pad footings"
-    elif floors <= 7 and not poor:
-        ftype = "Combined footings or raft"
-    elif floors <= 7 and poor:
-        ftype = "Raft foundation (poor soil)"
-    else:
+    # Type follows what the footings need, not the floor count alone: a raft once the
+    # footings would cover more than half the plan, combined footings once neighbouring
+    # pads would leave less than 0.5 m between them, piles for soft clay under a tall block.
+    trib = float(e["grid_bay_x_m"]) * float(e["grid_bay_y_m"])
+    bay = min(float(e["grid_bay_x_m"]), float(e["grid_bay_y_m"]))
+    cover = req_area_raw / trib if trib else 0.0
+    if poor and floors > 4:
         ftype = "Pile foundation with pile cap"
+    elif cover > 0.5:
+        ftype = "Raft foundation"
+    elif footing_side > bay - 0.5:
+        ftype = "Combined footings"
+    else:
+        ftype = "Isolated / pad footings"
 
     # Bearing pressure must be measured against the footing actually provided, not the
     # exact required area — service_load / (service_load / sbc) is identically the SBC, so
     # the old output could never differ from it and the "vs SBC" comparison said nothing.
     provided_area_raw = footing_side ** 2 if footing_side else 0.0
     provided_area = round(provided_area_raw, 2)
-    applied_raw = service_load_raw / provided_area_raw if provided_area_raw else 0.0
+    applied_raw = soil_load_raw / provided_area_raw if provided_area_raw else 0.0
     applied = round(applied_raw, 1)
     utilisation = round(applied_raw / sbc * 100, 1) if sbc else 0
-    trib = float(e["grid_bay_x_m"]) * float(e["grid_bay_y_m"])
     warnings = []
-    if req_area_raw > 0.35 * trib:
+    if cover > 0.5:
         warnings.append({"severity": "critical",
-                         "text": f"Required footing area {req_area} m² exceeds 35% of the {trib} m² column grid — "
-                                 f"SBC of {sbc} kN/m² is insufficient for the {round(service_load_raw)} kN service load. "
-                                 "Switch to a raft or piles, or improve the ground.",
+                         "text": f"Required footing area {req_area} m² is {round(cover * 100)}% of the {trib} m² column grid — "
+                                 f"isolated footings would cover more than half the plan at SBC {sbc} kN/m². "
+                                 "Use a raft or piles, or improve the ground.",
                          "clause": C.clause("sbc")})
-    elif req_area_raw > 0.2 * trib:
+    elif ftype == "Combined footings":
         warnings.append({"severity": "warning",
-                         "text": f"Footings occupy {round(req_area_raw / trib * 100)}% of the grid area — combined footings "
-                                 "or a raft may be more economical.", "clause": C.clause("found_type")})
+                         "text": f"A {footing_side} m footing leaves less than 0.5 m to the next one on a {bay} m grid — "
+                                 "combine neighbouring footings.", "clause": C.clause("found_type")})
     if poor and floors > 4:
         warnings.append({"severity": "critical", "text": "Soft clay with more than 4 floors — deep foundations required, "
                                                          "with settlement analysis.", "clause": C.clause("found_type")})
@@ -553,11 +566,15 @@ def m3_foundation(project, base, e, loads):
             out("Angle of internal friction φ", soil["phi"], "°", "sbc"),
             out("Minimum foundation depth Df", df, "m", "rankine", "Rankine: (q/γ)·((1−sinφ)/(1+sinφ))²"),
             out("Column service load", round(service_load_raw, 1), "kN", "found_type"),
+            # On screen for the hand check; the assistant already has the service load.
+            {**out("Load on soil (incl. footing self-weight)", round(soil_load_raw, 1), "kN", "found_type",
+                   f"service load + {e.get('footing_self_weight_pct') or 0:g}% for the footing and backfill"),
+             "assistant": False},
             out("Required footing area", req_area, "m²", "found_type"),
             out("Isolated footing size", f"{footing_side} × {footing_side}", "m", "found_type"),
             out("Provided footing area", provided_area, "m²", "found_type", "size rounded up from the required area"),
             out("Applied bearing pressure", applied, "kN/m²", "sbc",
-                f"service load ÷ provided footing area, vs SBC {sbc} kN/m²"),
+                f"load on soil ÷ provided footing area, vs SBC {sbc} kN/m²"),
             out("Bearing capacity utilisation", utilisation, "%", "sbc",
                 "applied pressure as a share of the safe bearing capacity"),
         ],
@@ -573,7 +590,8 @@ def m4_mix_design(project, base, e):
     s = C.MIX_STD_DEV.get(grade, 5.0)
     # Proportioning is shared with the quantity take-off, which needs cement, sand and
     # aggregate per m3 for the very same grade.
-    mix = takeofflib.mix_proportions(grade, e["exposure_condition"], agg)
+    mix = takeofflib.mix_proportions(grade, e["exposure_condition"], agg, e.get("slump_mm"),
+                                     e.get("admixture_water_reduction_pct"), e.get("wc_chosen"))
     target = mix["target_strength"]
     wc = mix["wc_ratio"]
     water = mix["water_l"]
@@ -603,8 +621,13 @@ def m4_mix_design(project, base, e):
             out("Target mean strength f'ck", target, "N/mm²", "mix_target", f"fck + 1.65 × {s}"),
             out("Exposure condition", e["exposure_condition"], "", "mix_wc",
                 f"max w/c {exposure['max_wc']}, min cement {exposure['min_cement']} kg/m³, cover {exposure['cover']} mm"),
-            out("Free water-cement ratio", wc, "", "mix_wc"),
-            out("Water content", water, "litre/m³", "mix_water", f"{agg} mm aggregate, 25–50 mm slump"),
+            out("Free water-cement ratio", wc, "", "mix_wc",
+                "chosen by experience, within the durability limit" if e.get("wc_chosen")
+                else "IS 456 Table 5 durability limit (no strength-based choice entered)"),
+            out("Water content", water, "litre/m³", "mix_water",
+                f"{agg} mm aggregate, {e.get('slump_mm') or 50:g} mm slump"
+                + (f", {e['admixture_water_reduction_pct']:g}% admixture reduction"
+                   if e.get("admixture_water_reduction_pct") else "")),
             out("Cement content", cement, "kg/m³", "mix_cement", e["cement_type"]),
             out("Coarse aggregate volume fraction", mix["ca_volume_fraction"], "", "mix_ca"),
             out("Fine aggregate", fine, "kg/m³", "mix_ca"),

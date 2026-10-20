@@ -44,7 +44,13 @@ const INPUTS = {
     ["grid_bay_y_m", "Grid bay Y", "m", 0.5],
     ["beam_span_m", "Beam span", "m", 0.5],
   ],
-  mix: [["concrete_volume_cum", "Concrete volume for BOQ", "m³", 1]],
+  foundation: [["footing_self_weight_pct", "Footing self-weight allowance", "%", 1]],
+  mix: [
+    ["slump_mm", "Slump", "mm", 25],
+    ["admixture_water_reduction_pct", "Water reduction by admixture", "%", 1],
+    ["wc_chosen", "w/c chosen by experience (0 = durability limit)", "", 0.01],
+    ["concrete_volume_cum", "Concrete volume for BOQ", "m³", 1],
+  ],
   water: [["sump_depth_m", "Sump depth", "m", 0.1], ["oht_tanks", "OH tanks", "nos", 1]],
   storm: [["roof_area_sqm", "Roof catchment area", "m²", 10], ["rain_intensity_override", "Rainfall intensity override", "mm/hr", 5]],
   parking_nbc: [

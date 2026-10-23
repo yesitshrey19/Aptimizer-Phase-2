@@ -25,12 +25,19 @@ const ThreeDModule = lazy(() => import("../modules/ThreeDModule"));
 const BimModule = lazy(() => import("../modules/BimModule"));
 const CalculationsModule = lazy(() => import("../modules/CalculationsModule"));
 const EngineeringModule = lazy(() => import("../modules/EngineeringModule"));
+const BoqModule = lazy(() => import("../modules/BoqModule"));
+const CostModule = lazy(() => import("../modules/CostModule"));
+const ProcurementMarketModule = lazy(() => import("../modules/ProcurementMarketModule"));
+const ProgrammeModule = lazy(() => import("../modules/ProgrammeModule"));
+const FinanceModule = lazy(() => import("../modules/FinanceModule"));
 
 const COMPONENTS = {
   plot: SiteModule, gis: GisModule, township: TownshipModule, reports: SiteReportsModule,
   planning: PlanningModule, "autonomous-studio": AutonomousStudioModule, parking: ParkingModule,
   studio: GenerativeStudioModule, "3d": ThreeDModule, bim: BimModule,
   calculations: CalculationsModule, engineering: EngineeringModule,
+  boq: BoqModule, cost: CostModule, procurement: ProcurementMarketModule,
+  programme: ProgrammeModule, finance: FinanceModule,
 };
 const GROUPS = WORKSPACE_CATALOG.map(g => [g.id, g.label, g.modules.map(m => [m.id, m.name, m.icon, COMPONENTS[m.id]])]);
 

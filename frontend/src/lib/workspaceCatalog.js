@@ -1,6 +1,6 @@
-// Aptimizer catalogue: Stage 1 (Site) plus the stages added so far. Shared by navigation and the public directory.
+// Aptimizer catalogue: Stage 1 (Site) plus the stages added so far (Stage 4: Cost & Procurement). Shared by navigation and the public directory.
 // Parameter labels reflect the actual module inputs/outputs; the directory is a curated index, not certification.
-import { Box, Building2, Calculator, Car, DraftingCompass, FileText, Globe2, Landmark, Map, Ruler, Shapes, Sparkles } from "lucide-react";
+import { Box, Building2, CalendarClock, Calculator, Car, ClipboardList, DraftingCompass, FileText, Globe2, Landmark, Map, Ruler, Shapes, ShoppingCart, Sparkles, TrendingUp, Wallet } from "lucide-react";
 
 const input = (name, unit, basis) => ({ name, unit, basis, kind: "Input" });
 const computed = (name, unit, basis) => ({ name, unit, basis, kind: "Calculated" });
@@ -238,6 +238,89 @@ export const WORKSPACE_CATALOG = [
       computed("AutoCAD DWG export", "file", "Native AutoCAD .dwg site plan export alongside .dxf R2018 and georeferenced .ifc (IFC4) exports."),
     ] },
   ] },
+  { id: "cost-procurement", label: "Cost & Procurement", icon: Wallet, modules: [
+    { id: "boq", name: "BOQ & Quantities", icon: ClipboardList, note: "Material, labour and equipment schedules.", parameters: [
+      input("Quantity ratios & wastage", "ratio / %", "Editable estimating assumptions."),
+      input("Editable material, labour & equipment unit rates in BOQ tables", "INR / unit", "Per-item unit rates editable directly inside the Material, Labour (man-days), and Equipment (days) BOQ schedules."),
+      computed("Basis built-up area & units", "m² / count", "The basis the quantity take-off is computed against."),
+      computed("Line items", "count", "Rows the generated estimate resolves to."),
+      estimate("Concrete, steel & finishes", "m³ / kg / m²", "Structural take-off when available; ratio-based estimates are labelled."),
+      estimate("Trade labour man-days & equipment operating days", "man-days / days", "Trade-by-trade labour man-days and equipment operating days derived from material quantities and productivity norms."),
+      computed("Material, labour & equipment sub-totals", "INR", "Quantities × the project's own rates."),
+      computed("BOQ grand total", "INR", "Sum of the three schedules before cost adders."),
+      computed("BOQ PDF & Excel workbook exports", "PDF / XLSX", "Direct export of the priced Bill of Quantities as a formatted PDF report or multi-sheet Excel (.xlsx) workbook."),
+      estimate("Quantity optimiser scenarios", "options", "Automated value-engineering and quantity optimisation recommendations."),
+    ] },
+    { id: "cost", name: "Cost Estimation", icon: Wallet, note: "Rates and an itemised project cost.", parameters: [
+      input("Material, labour & equipment rates", "INR", "Project rates; defaults are not supplier quotations."),
+      input("Overheads, contingency & GST", "%", "Sequential cost adders."),
+      input("Wastage allowance", "%", "Estimating allowance applied on top of quantities."),
+      input("Currency", "code", "Currency the project is costed in (INR by default)."),
+      estimate("Total & per-unit cost", "INR / INR per unit", "Quantities × rates plus configured cost adders."),
+      computed("Cost breakdown by head", "INR / %", "Material, labour and equipment shares of the total."),
+      computed("Material, labour & equipment cost per m² and per flat", "INR/m² / INR/flat", "Head-by-head breakdown of Material, Labour, and Equipment cost per m² of built-up area and per dwelling unit."),
+      computed("Cost per m² built-up", "INR", "Total cost spread over built-up area."),
+      estimate("Cost optimisation & value-engineering scenarios", "INR / % saving", "Automated cost optimiser suggestions comparing candidate specification adjustments against current total cost."),
+      estimate("AI cost review", "text", "AI audit of unit rates against Indian residential benchmarks flagging key cost drivers and value-engineering savings."),
+    ] },
+    { id: "procurement", name: "Smart Procurement & Market", icon: ShoppingCart, note: "Procurement scenarios and market context.", parameters: [
+      input("Material demand & suppliers", "quantity / records", "Procurement planning inputs."),
+      input("Metro market", "city", "Indexed rate basket the market view is read from."),
+      input("Educational knowledge-base topic selection", "topic", "Topic selector (FAR, seismic, wind, concrete, rebar, CPM) for interactive civil engineering code explanations."),
+      estimate("Price outlook & order schedule", "INR / dates", "Indicative market scenarios, not guaranteed live quotes."),
+      computed("Indexed commodity rates", "INR / unit", "Published index rates by metro; confirm with live quotations before ordering."),
+      computed("30-day commodity price trend & volatility rating", "% / High-Moderate-Low", "30-day price movement percentage and volatility classification per material in the selected metro."),
+      estimate("12-month price forecast series (lower/upper bounds & confidence)", "INR / %", "Monthly projected commodity price with lower/upper confidence bounds, forecast confidence, and monsoon/demand procurement advisory."),
+      computed("Pre-qualified supplier scorecards (rating, on-time delivery & credit terms)", "★ / % / days / IS codes", "Tier-1 vendor scorecards reporting quality rating, on-time delivery, credit terms, and certified IS standards."),
+      computed("JIT procurement milestones linked to CPM activities", "dates / quantity / activity ID", "Just-In-Time material order and delivery dates synchronized with CPM schedule activity IDs and batch quantities."),
+      estimate("Material EOQ, safety stock, reorder point & storage yard allocation", "qty / days / yard area", "Per-material total demand, daily consumption rate, lead time, buffer safety stock, reorder point, Economic Order Quantity (EOQ), and site yard storage allocation."),
+      estimate("Tender value & earnest money", "INR", "Indicative tender value and the 1% EMD convention."),
+      estimate("Contract structure & escalation", "scenario", "Suggested contract form with an annualised inflation assumption."),
+      computed("Tender NIT package (reference no., completion period & compiled sections)", "months / sections / ZIP", "Notice Inviting Tender (NIT) reference number, completion period, compiled CPWD/item-rate tender sections, and downloadable tender package."),
+      estimate("Stockout risk & carrying cost", "risk / INR", "Inventory scenario derived from the demand and market assumptions."),
+      computed("Dossier readiness", "%", "How much of the procurement documentation set is complete."),
+      computed("Statutory clearance agencies & required attachments", "agencies / readiness %", "Agency-by-agency submission readiness (RERA, Fire, Municipal, Environmental) and required attachment checklists."),
+      computed("Engineering plugin marketplace & developer REST API specifications", "plugins / endpoints", "Third-party BIM/structural connector catalogue (STAAD.Pro, ETABS, Revit, Primavera) and headless REST API endpoint specifications."),
+      computed("Civil engineering educational guides (principle, rule of thumb & pitfalls)", "guide", "Interactive code-referenced engineering tutorials covering core principles, practical rules of thumb, and common mistakes."),
+    ] },
+    { id: "programme", name: "Programme & CPM", icon: CalendarClock, note: "Dependencies, critical path and schedule options.", parameters: [
+      input("Task name, phase, duration & dependency", "text / days / task", "Editable activities and precedence in the project network."),
+      input("Start date & target finish", "dates", "Programme timing inputs."),
+      input("Mobilisation & blockwork lag", "days / floors", "Schedule assumptions."),
+      input("Concrete crew size", "teams", "Number of concurrent concrete teams working at once."),
+      input("Crew assignments & task overrides", "crews / days", "Per-task resourcing and duration adjustments."),
+      input("Per-task pinned start/finish dates & task cost overrides", "date / INR", "In-place task date pinning, working-day override, crew size override, task cost override, and drag-and-drop row ordering."),
+      input("Added & removed tasks", "tasks", "Extra activities and exclusions applied to the generated network."),
+      computed("Critical path, float & finish forecast", "days / dates", "CPM on the supplied and configured activity network."),
+      computed("Floor cycle & phase breakdown", "days", "Time per typical floor and across project phases."),
+      computed("IS 456 minimum prop-removal & curing floor", "calendar days", "Mandatory concrete curing and formwork/prop removal waiting period per floor under IS 456 that cannot be compressed by adding labour."),
+      computed("Calendar days & build duration", "days", "Working days converted to the calendar forecast."),
+      computed("Implied per-person daily output & pin conflict warnings", "units/day/person / text", "Implied labour productivity when task duration is manually overridden, plus dependency blocker warnings on invalid pinned dates."),
+      estimate("Target-finish acceleration cost delta (overtime, crowding & preliminaries)", "INR / days", "Cost impact of accelerating or extending the schedule: overtime premium, work-front crowding loss, and site running preliminaries."),
+      computed("Programme budget reconciliation vs. BOQ total", "INR", "Comparison of scheduled task costs, user-added task costs, acceleration premiums, and preliminaries against the BOQ grand total."),
+      estimate("Construction equipment planning & logistics fleet (IS 4573 / IS 4925 / IS 5121)", "cranes / m³/h / mixers / hoists / kW", "Tower crane count and hook-time utilisation, batching plant capacity, transit mixers, passenger/material hoists, concrete pump type, connected electrical load, and diesel consumption."),
+      estimate("AI programme review", "text", "AI narrative identifying critical-path drivers and realistic schedule recovery opportunities."),
+    ] },
+    { id: "finance", name: "Feasibility & ROI", icon: TrendingUp, note: "Cash flow and investment scenarios.", parameters: [
+      input("Sale rate", "INR / sqft", "Project sales assumption."),
+      input("Land, approval & other income", "INR", "Project cost and income inputs."),
+      input("Marketing & contingency", "%", "Configured cost assumptions."),
+      input("Borrowed share & interest rate", "% / year", "Financing assumptions."),
+      input("Discount rate", "% / year", "Annual discount rate editable in financial assumptions for cash-flow valuation."),
+      input("Build time, launch & selling period", "months", "Cash-flow timing inputs."),
+      input("Pre-sales at launch", "%", "Configured sales assumption."),
+      estimate("Revenue, ROI, IRR & payback", "INR / % / months", "Cash-flow model; financial outcomes are forecasts."),
+      computed("Gross revenue, total cost & net profit", "INR", "Revenue less cost, on the configured sales and cost bases."),
+      computed("Revenue schedule by flat type", "flats / saleable sqft / rate / INR", "Unit-type breakdown of flat count, total saleable super built-up area (sqft), area per flat, asking sale price, and gross revenue."),
+      computed("Margin & return on cost", "%", "Profit against revenue and against deployed cost."),
+      computed("Peak funding & cash-positive month", "INR / month", "The deepest funding requirement and when the cash flow turns."),
+      estimate("Monthly cash-flow curve (inflows, outflows & cumulative cash in hand)", "INR / month", "Month-by-month cash movement and cumulative balance curve over the construction and sales horizon."),
+      computed("Break-even units, rate & headroom", "units / INR per sqft / %", "How much stock must sell, at what rate, before the scheme is profitable."),
+      computed("Cost per saleable sqft", "INR", "Total cost spread over saleable area."),
+      estimate("AI feasibility review", "text", "AI financial assessment of project viability, return drivers, and margin sensitivity."),
+    ] },
+  ] },
+
 ];
 export const WORKSPACE_MODULES = WORKSPACE_CATALOG.flatMap(group => group.modules);
 export const PARAMETER_COUNT = WORKSPACE_MODULES.reduce((total, module) => total + module.parameters.length, 0);

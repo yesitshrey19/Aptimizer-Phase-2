@@ -147,6 +147,7 @@ export default function PlotModule({ project, analysis, update, readOnly, goToMo
       setProject((prev) => ({ ...prev, towers: res.towers, ...(res.rev !== undefined && { rev: res.rev }) }));
       toast.success(
         `Layout saved — ${res.tower_count} tower(s), ${res.floors.join(" / ")} floors`
+          + (res.kept_user_floors ? " (your floor counts kept; use Apply site layout in Apartment Planning to take the layout's)" : "")
       );
     } catch (e) {
       toast.error(apiError(e.response?.data?.detail, "Layout generated, but the towers could not be updated."));

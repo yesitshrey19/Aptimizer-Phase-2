@@ -521,7 +521,7 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
   const syncFromLayout = async () => {
     setSyncing(true);
     try {
-      const res = await syncTowersFromLayout(projectId, project.site_layout);
+      const res = await syncTowersFromLayout(projectId, project.site_layout, { overrideFloors: true });
       setProject((prev) => ({ ...prev, towers: res.towers, ...(res.rev !== undefined && { rev: res.rev }) }));
       setActiveIdx(0);
       setFloor(1);
@@ -862,7 +862,8 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
         <Section title={`${t.name} — floor planning`} testid="floor-planning-section">
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Tower name" value={t.name} disabled={readOnly} onChange={(v) => setT("name", v)} testid="tower-name-input" />
-            <NumField label="Floor count" suffix={engineTowers.length ? "from site layout" : ""} value={t.floors} disabled={readOnly} onChange={(v) => setT("floors", v)} testid="tower-floors-input" />
+            <NumField label="Floor count" suffix={t.floors_set_by_user ? "set by you" : engineTowers.length ? "from site layout" : ""} value={t.floors} disabled={readOnly}
+              onChange={(v) => update((p) => { p.towers[activeIdx].floors = v; p.towers[activeIdx].floors_set_by_user = true; })} testid="tower-floors-input" />
             <NumField label="Floor-to-floor height" suffix="m" step={0.1} value={t.floor_height} disabled={readOnly} onChange={(v) => setT("floor_height", v)} testid="tower-floor-height-input" />
             <NumField label="Typical floor plate footprint" suffix="m²" value={t.footprint_area} disabled={readOnly} onChange={(v) => setT("footprint_area", v)} testid="tower-footprint-input" />
             <NumField label="Corridor width" suffix="m" step={0.1} value={t.corridor_width} disabled={readOnly} onChange={(v) => setT("corridor_width", v)} testid="tower-corridor-width-input" />

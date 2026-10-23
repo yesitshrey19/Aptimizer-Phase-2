@@ -154,10 +154,11 @@ export async function downloadFile(path, filename) {
  *  so the project's tower list is written from here rather than kept separately. `siteLayout` is the layout the caller just computed — it is sent
  *  because it is usually still ahead of the autosaved copy on the server.
  */
-export const syncTowersFromLayout = async (projectId, siteLayout) => {
+export const syncTowersFromLayout = async (projectId, siteLayout, { overrideFloors = false } = {}) => {
   if (!projectId) return null;
   const { data } = await api.post(`/projects/${projectId}/towers/sync-from-layout`, {
     site_layout: siteLayout || null,
+    override_floors: overrideFloors,
   });
   return data;
 };

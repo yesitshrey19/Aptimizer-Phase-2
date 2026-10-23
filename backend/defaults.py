@@ -79,14 +79,24 @@ def _tower_letter(i):
     return f"Tower {chr(65 + i)}" if i < 26 else f"Tower {i + 1}"
 
 
-def apply_layout_to_tower(tower, engine_tower, name, policy=None):
+def apply_layout_to_tower(tower, engine_tower, name, policy=None, override_floors=False):
     """Stamp one packed block's geometry onto the project tower that represents it.
 
     Only the things the site layout engine decides -- how tall the building is and how big
     its plate is -- are overwritten. The unit mix, cores, corridors and generated room
     layouts belong to the user and are carried across untouched.
+
+    A floor count the user typed (`floors_set_by_user`) is kept: the engine's figure is
+    the most the plot's FAR allows, and the automatic re-layout the 3D view runs used to
+    replace a deliberate 8-storey tower with that maximum. `override_floors` is the
+    explicit "Apply site layout" action, which takes the engine's floors and clears the mark.
     """
-    floors = max(int(engine_tower.get("floors") or tower.get("floors") or 1), 1)
+    user_floors = int(tower.get("floors") or 0) if tower.get("floors_set_by_user") else 0
+    if override_floors or not user_floors:
+        floors = max(int(engine_tower.get("floors") or tower.get("floors") or 1), 1)
+        tower.pop("floors_set_by_user", None)
+    else:
+        floors = user_floors
     tower["name"] = name
     tower["floors"] = floors
 
@@ -114,7 +124,7 @@ def apply_layout_to_tower(tower, engine_tower, name, policy=None):
     return tower
 
 
-def towers_from_site_layout(existing, engine_towers, policy=None):
+def towers_from_site_layout(existing, engine_towers, policy=None, override_floors=False):
     """Reconcile the project's tower list with what the site layout engine packed.
 
     The engine is the authority on how many buildings the land takes and how many floors
@@ -137,7 +147,7 @@ def towers_from_site_layout(existing, engine_towers, policy=None):
         else:
             taken.add(idx)
             tower = dict(existing[idx])
-        out.append(apply_layout_to_tower(tower, et, name, policy))
+        out.append(apply_layout_to_tower(tower, et, name, policy, override_floors))
     return out
 
 

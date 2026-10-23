@@ -728,6 +728,9 @@ class SyncTowersIn(BaseModel):
     # debounce before autosave writes it, and syncing off the stale stored copy would
     # rebuild the towers from the previous run.
     site_layout: Optional[Dict[str, Any]] = None
+    # True only for the explicit "Apply site layout" action: take the engine's floors even
+    # where the user typed their own. Automatic re-layouts keep the user's floor counts.
+    override_floors: bool = False
 
 
 @api.post("/projects/{project_id}/towers/sync-from-layout")
@@ -749,7 +752,7 @@ async def sync_towers_from_layout(project_id: str, body: SyncTowersIn = SyncTowe
 
     before = proj.get("towers") or []
     policy = proj.get("residential_policy") or new_residential_policy()
-    towers = towers_from_site_layout(before, engine_towers, policy)
+    towers = towers_from_site_layout(before, engine_towers, policy, body.override_floors)
     updates = {"towers": towers, "updated_at": now_iso()}
     updates["residential_policy"] = policy
     updates["unit_mix"] = summarize_units(towers)
@@ -768,6 +771,7 @@ async def sync_towers_from_layout(project_id: str, body: SyncTowersIn = SyncTowe
         "added": max(len(towers) - len(before), 0),
         "removed": max(len(before) - len(towers), 0),
         "floors": [t["floors"] for t in towers],
+        "kept_user_floors": any(t.get("floors_set_by_user") for t in towers),
         "rev": (fresh or {}).get("rev"),
     }
 

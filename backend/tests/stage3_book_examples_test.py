@@ -156,3 +156,9 @@ def test_rational_method_ignou_example_2_1():
     o = {x["label"]: x["value"] for x in E.m6_storm_rwh({}, base, e, C.city_reference("Bengaluru", "Karnataka"))["outputs"]}
     assert o["Weighted runoff coefficient C"] == pytest.approx(0.4, abs=1e-3)
     assert within(o["Peak storm runoff Q"], 0.17733, 0.5)
+
+
+# ------------------------------------------------------------------ S3-068 rainfall
+def test_bengaluru_annual_rainfall_is_the_imd_1991_2020_normal():
+    """IMD climatological table, Bengaluru City, 1991-2020: annual mean rainfall 1,077.6 mm."""
+    assert C.city_reference("Bengaluru", "Karnataka")["annual_rainfall_mm"] == 1077.6

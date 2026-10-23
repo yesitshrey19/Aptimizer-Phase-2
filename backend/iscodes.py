@@ -645,7 +645,10 @@ CITIES = {
     "Ludhiana": ("Punjab", "IV", 50, 750, 70),
     "Amritsar": ("Punjab", "IV", 50, 700, 70),
     "Jalandhar": ("Punjab", "IV", 50, 700, 70),
-    "Bengaluru": ("Karnataka", "II", 33, 970, 60),
+    # Annual rainfall: IMD climatological table, Bengaluru City, 1991-2020 normal = 1,077.6 mm
+    # (mausam.imd.gov.in Bengaluru station page; checked in Phase II Stage 3, 23 Oct 2026).
+    # The 970 mm it replaces matched neither the 1981-2010 (986 mm) nor the current normal.
+    "Bengaluru": ("Karnataka", "II", 33, 1077.6, 60),
     "Mysuru": ("Karnataka", "II", 33, 800, 55),
     "Mangaluru": ("Karnataka", "III", 39, 3500, 100),
     "Hubballi": ("Karnataka", "III", 39, 800, 55),

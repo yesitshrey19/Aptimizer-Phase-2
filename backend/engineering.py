@@ -59,6 +59,7 @@ DEFAULT_ENGINEERING = {
     "aisle_width_m": 6.0,
     "two_wheeler_provided": 0,
     "refuge_floors_provided": 0,
+    "apartments_have_balconies": None,  # None -> read from the flats' balcony area
     "extinguishers_per_floor": 0,
     "rwh_provided": True,
     "fire_lift_car_m": [1.2, 2.2],
@@ -907,11 +908,13 @@ def m8_fire(project, base, e):
             ],
         }
 
-    need_two_stairs = h > F["two_stair_height_m"]
-    need_refuge = h > F["refuge_above_m"]
-    refuge_floors = list(range(F["refuge_every_floors"], floors + 1, F["refuge_every_floors"])) if need_refuge else []
+    # "15 m or above" (Cl. 2.38) is inclusive; refuge is for "more than 24 m" (Annex E-4).
+    need_two_stairs = h >= F["two_stair_height_m"]
+    has_balconies = _flats_have_balconies(e, tallest)
+    refuge_floors = _refuge_floors(F, h, floors, tallest, has_balconies)
+    need_refuge = bool(refuge_floors)
     car = e["fire_lift_car_m"]
-    need_fire_lift = h > F["fire_lift_above_m"]
+    need_fire_lift = h >= F["fire_lift_above_m"]
     need_press = h > F["pressurisation_above_m"]
     ext_per_floor = math.ceil(plate / F["extinguisher_per_sqm"]) if plate else 0
 
@@ -921,16 +924,22 @@ def m8_fire(project, base, e):
         check(f"Travel distance to nearest exit ≤ {F['max_travel_m']:g} m",
               travel <= F["max_travel_m"] and travel > 0,
               f"{travel} m", f"≤ {F['max_travel_m']:g} m", "fire_travel"),
-        check("Minimum 2 staircases above 24 m", (stair_count >= 2) if need_two_stairs else stair_count >= 1,
+        check(f"2 staircases from {F['two_stair_height_m']:g} m",
+              (stair_count >= 2) if need_two_stairs else stair_count >= 1,
               stair_count, "≥ 2" if need_two_stairs else "≥ 1", "fire_stairs",
               f"building height {h} m"),
-        check("Staircase clear width ≥ 1.5 m", stair_width >= F["stair_min_width_m"], f"{stair_width} m",
-              "≥ 1.5 m", "fire_stairs"),
-        check("Refuge area every 7th floor above 24 m",
+        check(f"Stair width ≥ {F['stair_min_width_m']:g} m",
+              stair_width >= F["stair_min_width_m"], f"{stair_width} m",
+              f"≥ {F['stair_min_width_m']:g} m", "fire_stairs"),
+        check(f"Refuge area above {F['refuge_above_m']:g} m",
               (int(e["refuge_floors_provided"]) >= len(refuge_floors)) if need_refuge else True,
-              e["refuge_floors_provided"], len(refuge_floors) if need_refuge else 0, "fire_refuge",
-              f"required at floors {refuge_floors}" if refuge_floors else "not applicable below 24 m"),
-        check("Fire lift provided above 30 m", (lifts >= 1) if need_fire_lift else True, lifts,
+              e["refuge_floors_provided"], len(refuge_floors), "fire_refuge",
+              f"required at floors {refuge_floors}" if refuge_floors else (
+                  f"balcony flats exempt to {F['refuge_balcony_from_m']:g} m"
+                  if has_balconies and h > F["refuge_above_m"] else
+                  f"not required up to {F['refuge_above_m']:g} m")),
+        check(f"Fire lift from {F['fire_lift_above_m']:g} m",
+              (lifts >= 1) if need_fire_lift else True, lifts,
               "≥ 1 fire lift" if need_fire_lift else "not applicable", "fire_lift"),
         check("Fire lift car ≥ 1.1 × 2.1 m (stretcher)",
               (float(car[0]) >= F["fire_lift_car"][0] and float(car[1]) >= F["fire_lift_car"][1])
@@ -981,6 +990,40 @@ def m8_fire(project, base, e):
             out("Stairwell pressurisation", "required" if need_press else "not required", "", "fire_press"),
         ],
     }
+
+
+def _flats_have_balconies(e, tower):
+    """Annex E-4: apartments with balconies are exempt from refuge areas up to 60 m.
+    Read from the flats' balcony area unless the project says otherwise."""
+    if e.get("apartments_have_balconies") is not None:
+        return bool(e["apartments_have_balconies"])
+    return float((tower or {}).get("balcony_sqm") or 0.0) > 0.0
+
+
+def _floor_level(f, tower):
+    """Level of floor f above ground (floor 1 is the ground floor, at 0)."""
+    fh = float((tower or {}).get("floor_height") or 3.0)
+    gfh = float((tower or {}).get("ground_floor_height") or fh)
+    return 0.0 if f <= 1 else gfh + (f - 2) * fh
+
+
+def _refuge_floors(F, h, floors, tower, has_balconies):
+    """Floors needing a refuge area, NBC 2016 Annex E-4(d): the floor at or just above
+    24 m and then every 15 m; for apartments with balconies, none below 60 m and then at
+    60 m and every 30 m. A target at or above the building height needs nothing."""
+    if h <= F["refuge_above_m"]:
+        return []
+    start, step = ((F["refuge_balcony_from_m"], F["refuge_balcony_every_m"]) if has_balconies
+                   else (F["refuge_above_m"], F["refuge_every_m"]))
+    out, target = [], start
+    while target < h:
+        f = next((f for f in range(1, floors + 1) if _floor_level(f, tower) >= target - 1e-6), None)
+        if f is None:
+            break
+        if f not in out:
+            out.append(f)
+        target += step
+    return out
 
 
 # ================================================================ 9. accessibility

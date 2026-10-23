@@ -237,7 +237,7 @@ def test_the_clause_card_cannot_drift_from_the_constant_it_describes():
     """
     card = next(e for e in C.CODE_LIBRARY if e["id"] == "nbc4")
     assert f"Travel {C.FIRE['max_travel_m']:g} m" in card["key_value"]
-    assert f"> {C.FIRE['fire_lift_above_m']:g} m" in card["key_value"]
+    assert f"fire lift ≥ {C.FIRE['fire_lift_above_m']:g} m" in card["key_value"]
     assert "22.5" not in card["key_value"]
 
 

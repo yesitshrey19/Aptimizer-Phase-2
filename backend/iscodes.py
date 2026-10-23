@@ -141,11 +141,11 @@ CLAUSES = {
     "parking_accessible": {"code": "NBC 2016 Part 3 / RPwD Act 2016", "clause": "Cl. 13.4", "topic": "1 accessible bay per 50 spaces"},
     "parking_ev": {"code": "BEE / MoHUA EV Guidelines 2019", "clause": "Cl. 4.2", "topic": "20% EV-ready parking"},
     "parking_2w": {"code": "SP:21", "clause": "Cl. 8.4.2", "topic": "1 ECS = 3 two-wheeler spaces"},
-    "fire_travel": {"code": "NBC 2016 Part 4", "clause": "Cl. 4.6.2", "topic": "Travel distance to exit ≤ 30 m (Group A-2 residential, Table 4)"},
-    "fire_stairs": {"code": "NBC 2016 Part 4", "clause": "Cl. 4.7", "topic": "Two staircases above 24 m, 1.5 m clear width"},
-    "fire_refuge": {"code": "NBC 2016 Part 4", "clause": "Cl. 4.14", "topic": "Refuge area every 7th floor above 24 m"},
+    "fire_travel": {"code": "NBC 2016 Part 4", "clause": "Table 5", "topic": "Travel distance ≤ 30 m, residential"},
+    "fire_stairs": {"code": "NBC 2016 Part 4", "clause": "Cl. 2.38", "topic": "Two stairs from 15 m; 1.25 m wide"},
+    "fire_refuge": {"code": "NBC 2016 Part 4", "clause": "Annex E-4", "topic": "Refuge above 24 m; balcony flats exempt"},
     "fire_ext": {"code": "NBC 2016 Part 4 / IS 2190", "clause": "Table 7", "topic": "1 extinguisher per 200 m² floor area"},
-    "fire_lift": {"code": "NBC 2016 Part 4", "clause": "Cl. 4.9", "topic": "Fire lift above 30 m, stretcher car 1.1 × 2.1 m"},
+    "fire_lift": {"code": "NBC 2016 Part 4", "clause": "Annex E-2", "topic": "Fire lift per tower from 15 m"},
     "fire_press": {"code": "NBC 2016 Part 4", "clause": "Cl. 4.7.6", "topic": "Stairwell pressurisation above 15 m"},
     "acc_ramp": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.3", "topic": "Accessible ramp slope max 1:12"},
     "acc_door": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.5", "topic": "Minimum clear door width 900 mm"},
@@ -434,9 +434,18 @@ _FIRE_NBC_2016 = {
     # 22.5 m here while engine.DEFAULT_RULES used 30 m, so the same project could pass
     # Compliance and fail Fire Safety on one number. Both now read this key.
     "max_travel_m": 30.0,
-    "stair_min_width_m": 1.5, "two_stair_height_m": 24.0,
-    "refuge_above_m": 24.0, "refuge_every_floors": 7, "extinguisher_per_sqm": 200.0,
-    "fire_lift_above_m": 30.0, "fire_lift_car": (1.1, 2.1), "pressurisation_above_m": 15.0,
+    # Read from NBC 2016 Part 4 itself (pages photographed in Phase II Stage 3, 23 Oct
+    # 2026). The previous 24 m / 30 m / "every 7th floor" / 1.5 m values were not in it.
+    # Cl. 2.38: high-rise = 15 m or above; Cl. 1.2 + 4.4.2.4.3.1: every high-rise has at
+    # least two staircases; Cl. 2.24 + Annex E-2: one firefighting shaft (with fireman's
+    # lift) per residential tower; Cl. 4.4.2.4.3.2(e): 1.25 m stairs for A-4 apartments.
+    "stair_min_width_m": 1.25, "two_stair_height_m": 15.0,
+    # Annex E-4(d): refuge above 24 m, at/just above 24 m and then every 15 m or so.
+    # Apartments with balconies are exempt up to 60 m, then at 60 m and every 30 m.
+    "refuge_above_m": 24.0, "refuge_every_m": 15.0,
+    "refuge_balcony_from_m": 60.0, "refuge_balcony_every_m": 30.0,
+    "extinguisher_per_sqm": 200.0,
+    "fire_lift_above_m": 15.0, "fire_lift_car": (1.1, 2.1), "pressurisation_above_m": 15.0,
     # Means-of-egress corridor width (NBC Part 4). Distinct from the accessibility
     # corridor in ACCESS below, which is a barrier-free requirement under Part 3 — the
     # governing width for a project is the larger of the two.
@@ -834,11 +843,11 @@ CODE_LIBRARY = [
     # which is the failure a single source of truth exists to prevent. Formatting it means
     # the card cannot say anything the engine is not checking.
     {"id": "nbc4", "code": "NBC 2016 Part 4", "topic": "Fire & life safety",
-     "key_value": ("Travel {max_travel_m:g} m; 2 stairs > {two_stair_height_m:g} m at "
-                   "{stair_min_width_m:g} m width; refuge every {refuge_every_floors}th "
-                   "floor > {refuge_above_m:g} m; fire lift > {fire_lift_above_m:g} m"
+     "key_value": ("Travel {max_travel_m:g} m; 2 stairs ≥ {two_stair_height_m:g} m, "
+                   "{stair_min_width_m:g} m wide; refuge > {refuge_above_m:g} m; "
+                   "fire lift ≥ {fire_lift_above_m:g} m"
                    ).format(**_FIRE_NBC_2016),
-     "clause": "Cl. 4.6, 4.7, 4.9, 4.14"},
+     "clause": "Cl. 2.38, 4.4.2.4.3, Table 5, Annex E"},
     {"id": "nbc8", "code": "NBC 2016 Part 8 / SP:21", "topic": "Building services & parking",
      "key_value": "1 ECS per 100 m² built-up; ramp 1:8; headroom 2.4 m; aisle 6.0 m; 1 ECS = 3 two-wheelers",
      "clause": "Cl. 8.4"},

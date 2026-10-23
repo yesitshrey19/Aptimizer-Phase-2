@@ -141,3 +141,18 @@ def test_water_default_is_is1172_rate_for_a_city_above_one_lakh():
     assert sum(C.WATER_LPCD.values()) == 150
     assert C.WATER_LPCD["flushing"] == 45
     assert default_project("W", "QA", "Bengaluru", "W-1", "owner")["utility_config"]["lpcd"] == 150
+
+
+# ------------------------------------------------------------------ S3-067 rational method
+def test_rational_method_ignou_example_2_1():
+    """IGNOU 'Wastewater Collection and Characteristics', Example 2.1: C 0.4, i 76 mm/h,
+    A 2.1 ha -> Q = 638.40 m3/h = 177.33 l/s. Site C set to 0.4 by roof share on a lawn site."""
+    plot = 21000.0
+    roof = plot * (0.4 - C.RUNOFF_C["lawn"]) / (C.RUNOFF_C["rcc_roof"] - C.RUNOFF_C["lawn"])
+    base = {"areas": {"towers": [{"height_m": 12, "floors": 4, "floor_height": 3.0}],
+                      "ground_footprint_sqm": roof, "builtup_area_sqm": 0, "super_builtup_area_sqm": 0,
+                      "total_units": 0, "plot_area_sqm": plot}}
+    e = {**E.DEFAULT_ENGINEERING, "site_area_type": "lawn", "roof_area_sqm": roof, "rain_intensity_override": 76}
+    o = {x["label"]: x["value"] for x in E.m6_storm_rwh({}, base, e, C.city_reference("Bengaluru", "Karnataka"))["outputs"]}
+    assert o["Weighted runoff coefficient C"] == pytest.approx(0.4, abs=1e-3)
+    assert within(o["Peak storm runoff Q"], 0.17733, 0.5)

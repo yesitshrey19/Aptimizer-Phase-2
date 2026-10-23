@@ -517,8 +517,16 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
     engineTowers.length > 0 &&
     planFloors.length === engineFloors.length &&
     planFloors.every((f, i) => f === engineFloors[i]);
+  // Floors the user typed are kept by every automatic re-layout; only the explicit button
+  // below replaces them. The banner must say so, or it reads as an instruction to undo them.
+  const userFloors = towers.some((tw) => tw.floors_set_by_user);
+  const keepingUserFloors = !inStepWithLayout && userFloors && engineTowers.length > 0;
 
   const syncFromLayout = async () => {
+    if (keepingUserFloors && !window.confirm(
+      `Replace your floor counts (${planFloors.join(" / ")}) with the site layout's (${engineFloors.join(" / ")})?\n\n`
+      + "The layout's numbers are the most floors the plot's FAR allows. Keep yours if you set them on purpose."
+    )) return;
     setSyncing(true);
     try {
       const res = await syncTowersFromLayout(projectId, project.site_layout, { overrideFloors: true });
@@ -759,6 +767,8 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
             ? "bg-slate-50 border-slate-200"
             : inStepWithLayout
             ? "bg-emerald-50 border-emerald-200"
+            : keepingUserFloors
+            ? "bg-sky-50 border-sky-200"
             : "bg-amber-50 border-amber-200"
         }`}
         data-testid="layout-sync-banner"
@@ -782,6 +792,12 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
               floors <span className="font-mono" data-testid="engine-floors">{engineFloors.join(" / ")}</span>
               {inStepWithLayout ? (
                 <span className="text-emerald-700"> — planning and the 3D model match this layout.</span>
+              ) : keepingUserFloors ? (
+                <span className="text-sky-800" data-testid="user-floors-kept-note">
+                  {" "}(the most the FAR allows). <span className="font-semibold">Your floors are kept:</span>{" "}
+                  <span className="font-mono">{planFloors.join(" / ")}</span>. Nothing to do — only press the
+                  button if you want the layout's maximum instead.
+                </span>
               ) : (
                 <span className="text-amber-800">
                   {" "}— planning currently has{" "}
@@ -796,21 +812,22 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
         {engineTowers.length > 0 && !readOnly && (
           <Button
             size="sm"
-            variant={inStepWithLayout ? "outline" : "default"}
+            variant={inStepWithLayout || keepingUserFloors ? "outline" : "default"}
             className="h-7 rounded-sm text-xs shrink-0"
             data-testid="sync-towers-from-layout-button"
             disabled={syncing}
             onClick={syncFromLayout}
           >
             <RefreshCw className={`h-3 w-3 mr-1 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Applying…" : inStepWithLayout ? "Re-apply layout" : "Apply site layout"}
+            {syncing ? "Applying…" : inStepWithLayout ? "Re-apply layout"
+              : keepingUserFloors ? "Use layout's floors instead" : "Apply site layout"}
           </Button>
         )}
       </div>
 
       <Section
         title="Towers"
-        description="Count and floors come from the site layout engine — see Plot & Setbacks"
+        description="Tower count comes from the site layout engine (Plot & Setbacks). Floors you type here are kept."
         testid="towers-section"
         actions={
           !readOnly && (

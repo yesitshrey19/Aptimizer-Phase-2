@@ -8,13 +8,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { money, num } from "../lib/format";
 import QuantitiesModule from "./QuantitiesModule";
 
-const RateTable = ({ rows, testidPrefix, onRate, readOnly, qtyLabel, total, cur }) => (
+// Materials carry a site-wastage allowance (engine.DEFAULT_WASTAGE_PCT): amount =
+// quantity x (1 + wastage) x rate. It is shown as its own column, or a reader multiplying
+// quantity by rate finds a dozen lines that do not add up.
+const RateTable = ({ rows, testidPrefix, onRate, readOnly, qtyLabel, total, cur }) => {
+  const showWastage = rows.some((r) => r.wastage_pct != null);
+  return (
   <Table>
     <TableHeader>
       <TableRow>
         <TableHead>Item</TableHead>
         <TableHead>Unit</TableHead>
         <TableHead className="text-right">{qtyLabel}</TableHead>
+        {showWastage && <TableHead className="text-right">Wastage</TableHead>}
         <TableHead className="text-right w-36">Rate ({cur})</TableHead>
         <TableHead className="text-right">Amount</TableHead>
       </TableRow>
@@ -25,6 +31,11 @@ const RateTable = ({ rows, testidPrefix, onRate, readOnly, qtyLabel, total, cur 
           <TableCell className="py-1.5 font-medium">{r.label}</TableCell>
           <TableCell className="py-1.5 font-mono text-xs">{r.unit}</TableCell>
           <TableCell className="py-1.5 text-right font-mono">{num(r.quantity, 2)}</TableCell>
+          {showWastage && (
+            <TableCell className="py-1.5 text-right font-mono" data-testid={`${testidPrefix}-wastage-${r.key}`}>
+              {num(r.wastage_pct ?? 0, 0)}%
+            </TableCell>
+          )}
           <TableCell className="py-1.5">
             <Input
               type="number"
@@ -41,7 +52,7 @@ const RateTable = ({ rows, testidPrefix, onRate, readOnly, qtyLabel, total, cur 
         </TableRow>
       ))}
       <TableRow className="bg-slate-50">
-        <TableCell className="py-2 font-semibold" colSpan={4}>
+        <TableCell className="py-2 font-semibold" colSpan={showWastage ? 5 : 4}>
           Sub-total
         </TableCell>
         <TableCell className="py-2 text-right font-mono font-semibold" data-testid={`${testidPrefix}-total`}>
@@ -50,7 +61,8 @@ const RateTable = ({ rows, testidPrefix, onRate, readOnly, qtyLabel, total, cur 
       </TableRow>
     </TableBody>
   </Table>
-);
+  );
+};
 
 export default function BoqModule({ project, analysis, update, readOnly, projectId }) {
   const b = analysis?.boq;

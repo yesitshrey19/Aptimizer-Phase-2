@@ -421,7 +421,51 @@ DEFAULT_COST_ADDERS = {
 }
 
 
-def boq(project, areas, qty):
+# Services and external works a real project carries but a bill of structure and finishes
+# does not: without them the BOQ came in 44-73% under the construction cost developers
+# declare to RERA (Phase II Stage 4, P2-P4). Rates are ALLOWANCES (INR, 2026), editable
+# per project under project["services_rates"]; they are not taken from a schedule of rates
+# yet and should be replaced with CPWD plinth-area percentages or quotations.
+DEFAULT_SERVICES_RATES = {
+    "lift_each": 2200000.0,            # passenger lift, 8-13 pax, up to ~G+14
+    "electrical_per_sqm": 900.0,       # wiring/cabling beyond points, substation, DG, lighting
+    "plumbing_per_sqm": 700.0,         # internal water/drainage beyond fixtures, STP, WTP
+    "fire_per_sqm": 400.0,             # hydrant, wet riser, sprinklers (high-rise, 15 m and above)
+    "basement_per_sqm": 20000.0,       # excavation, retaining walls, RCC, waterproofing
+    "external_per_sqm": 1500.0,        # roads, drains, landscape, compound wall, RWH
+    "amenity_per_sqm": 25000.0,        # clubhouse and other built amenities
+}
+OPEN_AIR_AMENITY_WORDS = ("play", "park", "garden", "lawn", "jogging", "court", "ground")
+
+
+def services_items(project, areas, park=None):
+    """Lifts, building services, basements, external works and built amenities."""
+    r = {**DEFAULT_SERVICES_RATES, **(project.get("services_rates") or {})}
+    ba = float(areas.get("builtup_area_sqm") or 0)
+    towers = areas.get("towers") or []
+    lifts = sum(int(l.get("count") or 0) for t in project.get("towers") or [] for l in t.get("lifts") or [])
+    tall = max((float(t.get("height_m") or 0) for t in towers), default=0.0)
+    basement = 0.0
+    if park:
+        basement = float(park.get("basement_slots") or 0) * float(park.get("area_per_slot_actual") or 0)
+    open_site = max(float(areas.get("plot_area_sqm") or 0) - float(areas.get("ground_footprint_sqm") or 0), 0.0)
+    built_amenity = math.fsum(float(a.get("area") or 0) for a in project.get("society_amenities") or []
+                              if not any(w in str(a.get("name", "")).lower() for w in OPEN_AIR_AMENITY_WORDS))
+    rows = [
+        ("lifts", "Lifts (supply, installation, commissioning)", "nos", lifts, r["lift_each"]),
+        ("electrical_services", "Electrical services (cabling, substation, DG, lighting)", "m2 built-up", ba, r["electrical_per_sqm"]),
+        ("plumbing_services", "Plumbing, drainage, STP and WTP", "m2 built-up", ba, r["plumbing_per_sqm"]),
+        ("fire_fighting", "Fire-fighting (hydrant, wet riser, sprinklers)", "m2 built-up", ba if tall >= 15.0 else 0.0, r["fire_per_sqm"]),
+        ("basement", "Basement (excavation, retaining walls, structure)", "m2 basement", basement, r["basement_per_sqm"]),
+        ("external_works", "External development (roads, drains, landscape, compound wall)", "m2 open site", open_site, r["external_per_sqm"]),
+        ("amenities", "Clubhouse and built amenities", "m2", built_amenity, r["amenity_per_sqm"]),
+    ]
+    return [{"key": k, "label": lbl, "unit": u, "quantity": q, "rate": float(rt),
+             "amount": money_product(q, float(rt)), "allowance": True}
+            for k, lbl, u, q, rt in rows if q > 0]
+
+
+def boq(project, areas, qty, park=None):
     rates = {**DEFAULT_RATES, **(project.get("rates") or {})}
     wastage = {**DEFAULT_WASTAGE_PCT, **(project.get("wastage_pct") or {})}
     qmap = {i["key"]: i for i in qty["items"]}
@@ -460,7 +504,10 @@ def boq(project, areas, qty):
                           "rate": rate, "amount": money_product(days, rate)})
     equipment_total = round(sum(e["amount"] for e in equipment), 2)
 
-    works = round(material_total + labour_total + equipment_total, 2)
+    services = services_items(project, areas, park)
+    services_total = round(sum(s["amount"] for s in services), 2)
+
+    works = round(material_total + labour_total + equipment_total + services_total, 2)
 
     # Applied in sequence, each on the running total, which is how a bill is actually
     # built up: profit is earned on preliminaries, and tax is charged on the lot.
@@ -482,9 +529,9 @@ def boq(project, areas, qty):
     units = areas["total_units"] or 0
     ba = areas["builtup_area_sqm"] or 0
     return {
-        "materials": materials, "labour": labour, "equipment": equipment,
+        "materials": materials, "labour": labour, "equipment": equipment, "services": services,
         "material_total": material_total, "labour_total": labour_total,
-        "equipment_total": equipment_total,
+        "equipment_total": equipment_total, "services_total": services_total,
         "works_total": works, "adders": adders, "adders_total": round(grand - works, 2),
         "grand_total": grand,
         "cost_per_unit": round(grand / units, 2) if units else 0,
@@ -1015,7 +1062,7 @@ def analyse(project):
     areas = area_metrics(project)
     park = parking_metrics(project, areas)
     qty = quantities(project, areas)
-    bill = boq(project, areas, qty)
+    bill = boq(project, areas, qty, park)
     # The engineering config carries the project city; passing its reference data here
     # keeps the Utilities RWH yield consistent with the Storm/RWH module.
     eng_cfg = project.get("engineering") or {}
@@ -1034,6 +1081,7 @@ def analyse(project):
                 {"name": "Material", "value": bill["material_total"]},
                 {"name": "Labour", "value": bill["labour_total"]},
                 {"name": "Equipment", "value": bill["equipment_total"]},
+                {"name": "Services & external works", "value": bill["services_total"]},
             ],
         },
         "utilities": util, "compliance": comp,

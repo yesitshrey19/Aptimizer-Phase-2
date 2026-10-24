@@ -66,6 +66,11 @@ const EDITABLE = [
   // The packed site layout, persisted so it survives a reload and its staleness stamp
   // has something to compare against.
   "site_layout",
+  // Settings the Stage 2-4 screens edit. They were missing here, so parking, engineering,
+  // rate, finance and programme edits worked for the session and were lost on reload.
+  "parking", "residential_policy", "config", "quantity_ratios", "rates", "labour_rates",
+  "equipment_rates", "services_rates", "utility_config", "compliance_rules", "engineering",
+  "finance", "solar", "cost_adders", "wastage_pct", "schedule",
 ];
 
 export default function Workspace() {

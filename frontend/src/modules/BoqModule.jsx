@@ -70,6 +70,13 @@ export default function BoqModule({ project, analysis, update, readOnly, project
   const cur = b.currency;
 
   const setRate = (bucket) => (key, v) => update((p) => { p[bucket] = { ...(p[bucket] || {}), [key]: v }; });
+  // Services lines are priced from project["services_rates"], keyed by rate name.
+  const SERVICE_RATE_KEY = {
+    lifts: "lift_each", electrical_services: "electrical_per_sqm", plumbing_services: "plumbing_per_sqm",
+    fire_fighting: "fire_per_sqm", basement: "basement_per_sqm", external_works: "external_per_sqm",
+    amenities: "amenity_per_sqm",
+  };
+  const setServiceRate = (key, v) => setRate("services_rates")(SERVICE_RATE_KEY[key] || key, v);
 
   const dl = async (path, name) => {
     try {
@@ -86,10 +93,11 @@ export default function BoqModule({ project, analysis, update, readOnly, project
           as a separate destination in the sidebar. */}
       <QuantitiesModule project={project} analysis={analysis} update={update} readOnly={readOnly} projectId={projectId} />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Metric label="Material" value={money(b.material_total, cur)} testid="boq-material-total" />
         <Metric label="Labour" value={money(b.labour_total, cur)} testid="boq-labour-total" />
         <Metric label="Equipment" value={money(b.equipment_total, cur)} testid="boq-equipment-total" />
+        <Metric label="Services & external" value={money(b.services_total || 0, cur)} testid="boq-services-total" />
         <Metric label="BOQ grand total" value={money(b.grand_total, cur)} testid="boq-grand-total" />
       </div>
 
@@ -118,6 +126,15 @@ export default function BoqModule({ project, analysis, update, readOnly, project
         <RateTable rows={b.equipment} testidPrefix="boq-equipment" onRate={setRate("equipment_rates")} readOnly={readOnly}
           qtyLabel="Days" total={b.equipment_total} cur={cur} />
       </Section>
+
+      {(b.services || []).length > 0 && (
+        <Section title="Services & external works"
+          description="Allowances (editable rates): lifts, building services, basements, external development and built amenities. Replace with CPWD plinth-area percentages or quotations."
+          testid="boq-services-section">
+          <RateTable rows={b.services} testidPrefix="boq-services" onRate={setServiceRate} readOnly={readOnly}
+            qtyLabel="Quantity" total={b.services_total} cur={cur} />
+        </Section>
+      )}
     </div>
   );
 }

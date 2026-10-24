@@ -44,7 +44,7 @@ def validate_project(project):
         return value
 
     finite_tree(project, "")
-    for key in ("plot", "config", "parking", "residential_policy", "engineering", "utility_config", "rates", "labour_rates", "equipment_rates", "quantity_ratios", "cost_adders", "wastage_pct", "dev_controls"):
+    for key in ("plot", "config", "parking", "residential_policy", "engineering", "utility_config", "rates", "labour_rates", "equipment_rates", "services_rates", "quantity_ratios", "cost_adders", "wastage_pct", "dev_controls"):
         if key in project and not isinstance(project[key], dict):
             error(key, "Must be an object")
     policy = project.get("residential_policy") or {}
@@ -102,7 +102,7 @@ def validate_project(project):
                 number(item, "count", p, maximum=100000, integer=True)
                 for key in ("carpet_area", "balcony_area", "width", "capacity"):
                     number(item, key, p)
-    for group in ("rates", "labour_rates", "equipment_rates", "quantity_ratios", "cost_adders", "wastage_pct"):
+    for group in ("rates", "labour_rates", "equipment_rates", "services_rates", "quantity_ratios", "cost_adders", "wastage_pct"):
         grp = project.get(group) or {}
         if isinstance(grp, dict):
             for key in grp:

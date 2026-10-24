@@ -423,7 +423,7 @@ async def patch_project(project_id: str, body: ProjectPatch, user: dict = Depend
                # The programme config carries the user's per-task edits, so it has to be
                # saved with the project: a snapshot must reproduce the programme the user
                # actually approved, not the generated one underneath it.
-               "schedule", "finance", "solar", "cost_adders", "wastage_pct",
+               "schedule", "finance", "solar", "cost_adders", "wastage_pct", "services_rates",
                # Setbacks live under dev_controls and are the one stored value the site
                # envelope is built from. It was in neither this set nor the frontend's
                # editable list, so every setback edit was silently discarded on reload.

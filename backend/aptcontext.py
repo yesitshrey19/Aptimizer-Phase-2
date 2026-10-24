@@ -152,10 +152,12 @@ def cost_summary(an: Dict[str, Any]) -> Dict[str, Any]:
         "total": an["cost"]["total"], "per_unit": an["cost"]["per_unit"],
         "per_sqm": an["cost"]["per_sqm"], "currency": an["cost"]["currency"],
         "material_total": boq["material_total"], "labour_total": boq["labour_total"],
-        "equipment_total": boq["equipment_total"],
+        "equipment_total": boq["equipment_total"], "services_total": boq.get("services_total"),
         "works_total": boq["works_total"], "adders_total": boq["adders_total"],
+        # The take-off/ratio "source" tag per line was dropped to make room for the services
+        # total within the 10k-token budget; the basis is in calculation_basis.
         "materials": [{"item": m["label"], "quantity": m["quantity"], "unit": m["unit"],
-                       "rate": m["rate"], "amount": m["amount"], "source": m.get("source")}
+                       "rate": m["rate"], "amount": m["amount"]}
                       for m in boq["materials"]],
         "adders": [{"item": a["label"], "pct": a.get("pct"), "amount": a["amount"]}
                    for a in boq.get("adders", [])],

@@ -70,7 +70,9 @@ def test_floor_optimiser_maximises_profit_not_cost_per_flat(ctx):
     p, a = ctx
     r = P.floor_optimisation(p, a)
     rows = {x["floors"]: x for x in r["options"]}
-    assert rows[3]["cost_per_unit"] < rows[12]["cost_per_unit"]   # the degenerate direction
+    # Before services and external works were costed, cost per flat fell as the building
+    # shrank; with fixed site costs (external works, lifts, clubhouse) spread over fewer
+    # flats it no longer does, which is the real economics. The guard below still holds.
     best_floors = max(x["floors"] for x in r["options"] if x["profit"] == r["best"]["value"])
     assert best_floors >= 12, "the optimiser shrank the building"
     assert rows[best_floors]["units"] >= rows[12]["units"]

@@ -187,7 +187,9 @@ def m1_structural_loads(project, base, e, city):
 
     # IS 875-3 Cl. 7.4: F = Cf x Ae x pd. Cf was previously omitted, which is the same as
     # taking it as 1.0 and under-states the lateral force by 20-40%.
-    footprint_val = float(b.get("footprint") or 0.0)
+    # The tallest tower's own plate: the combined footprint of separate towers is not a
+    # face the wind acts on.
+    footprint_val = float((b.get("tallest") or {}).get("footprint_sqm") or b.get("footprint") or 0.0)
     face_width = math.sqrt(max(footprint_val, 1)) if footprint_val > 0 else 0
     along_wind = face_width                       # square-plan assumption from footprint
     a_over_b = (along_wind / face_width) if face_width else 1.0
@@ -388,6 +390,38 @@ def m2_seismic(project, base, e, city, loads):
     w = round(w_raw, 1)
     v = round(v_raw, 1)
 
+    # Each tower is its own building and resists its own seismic load. The figures above
+    # mixed them -- the tallest tower's height with the combined footprint as d, and W
+    # summed over every tower -- giving a base shear for a building that does not exist.
+    # The headline is now the governing tower (largest base shear); the per-tower table
+    # carries every tower.
+    per_tower = [_tower_seismic(t, z, soil_type, r,
+                                C.importance_factor(e["importance"], t.get("occupants") or 0)[0],
+                                spectral_acceleration, loads, frame_type, zone)
+                 for t in b["towers"]]
+    governing = None
+    if per_tower:
+        gov = max(per_tower, key=lambda t: t["base_shear_kn"])
+        gt = next(t for t in b["towers"] if t["id"] == gov["id"])
+        governing = gt["name"]
+        gh = max(float(gt["height_m"]), 3.0)
+        gd = _plan_dims(gt)
+        if not gd[0]:
+            gside = math.sqrt(max(float(gt["footprint_sqm"]), 1.0)) if gt["footprint_sqm"] else 0.0
+            gd = (gside, gside)
+        ta_raw, ta_formula, ta_dir = _governing_period(gh, gd, frame_type, soil_type)
+        ta = round(ta_raw, 3)
+        ta_bare = round(0.075 * gh ** 0.75, 3)
+        sa_raw = sa_g(ta_raw, soil_type)
+        sa = round(sa_raw, 3)
+        imp, imp_basis = C.importance_factor(e["importance"], float(gt.get("occupants") or 0))
+        ah_raw, ah_floored = C.ah_with_minimum(z * imp * sa_raw / (2 * r), zone)
+        ah = round(ah_raw, 5)
+        w_raw = math.fsum(_tower_weights(gt, dead_for_seismic, live, roof_dead))
+        v_raw = ah_raw * w_raw
+        w = round(w_raw, 1)
+        v = round(v_raw, 1)
+
     warnings = []
     if zone in ("IV", "V") and h > 15:
         warnings.append({"severity": "critical", "text": f"Building height {h} m in Zone {zone} — ductile detailing "
@@ -429,15 +463,12 @@ def m2_seismic(project, base, e, city, loads):
             out("Design horizontal coefficient Ah", ah, "", "base_shear",
                 f"Table 7 minimum for Zone {zone} governs" if ah_floored else "Z·I·(Sa/g) ÷ 2R"),
             out("Seismic weight W", w, "kN", "seismic_weight",
-                f"DL + {int(seismic_live_fraction(live) * 100)}% LL, roof DL only"),
-            out("Design base shear VB", v, "kN", "base_shear"),
+                f"{governing or 'site'}: DL + {int(seismic_live_fraction(live) * 100)}% LL, roof DL only"),
+            out("Design base shear VB", v, "kN", "base_shear", f"governing tower: {governing}" if governing else ""),
             out("Base shear as % of W", round(ah_raw * 100, 2), "%", "base_shear"),
         ],
         "recommendation": {"label": "Recommended lateral system", "value": system, "clause": C.clause("seismic_R")},
-        "per_tower": [_tower_seismic(t, z, soil_type, r,
-                                     C.importance_factor(e["importance"], t.get("occupants") or 0)[0],
-                                     spectral_acceleration, loads, frame_type, zone)
-                      for t in b["towers"]],
+        "per_tower": per_tower, "governing_tower": governing,
         "derived": {"base_shear": v, "vb_kn": v, "ah": ah, "seismic_weight": w},
     }
 

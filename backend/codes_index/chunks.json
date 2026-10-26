@@ -1,0 +1,167 @@
+[
+ {
+  "chunk_id": "nbc3#preamble",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "",
+  "heading": "NBC 2016 Part 3 — Development Control Rules and General Building Requirements (checked facts)",
+  "text": "NBC 2016 Part 3 — Development Control Rules and General Building Requirements (checked facts)\nNOTE — Values summarised in Aptimizer's own words from NBC 2016 Volume 1, checked page by page in Phase II testing. Page numbers are the printed page numbers of Part 3. This is not the text of the Code. NBC 2016 has since been replaced by SP 7:2026; these are the NBC 2016 values.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc3#12.2.1",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "Cl. 12.2.1",
+  "heading": "Height of habitable rooms",
+  "text": "12.2.1 Height of habitable rooms\nIn NBC 2016, every room used for human habitation (living room, bedroom) shall have a height of not less than 2.75 m, measured from the surface of the floor to the lowest point of the ceiling, that is the bottom of the slab. For pitched roofs the average height shall be not less than 2.75 m. Checked on page 43 of Part 3.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc3#12.2.2",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "Cl. 12.2.2",
+  "heading": "Size of habitable rooms",
+  "text": "12.2.2 Size of habitable rooms\nIn NBC 2016, where a dwelling has only one habitable room, its area shall be not less than 9.5 m² with a minimum width of 2.4 m. Where there are two habitable rooms, one shall be not less than 9.5 m² and the other not less than 7.5 m², with a minimum width of 2.1 m. Checked on page 44 of Part 3.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc3#12.3.2",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "Cl. 12.3.2",
+  "heading": "Size of kitchens",
+  "text": "12.3.2 Size of kitchens\nIn NBC 2016, a kitchen in a residential building where a separate dining area is provided shall have an area of not less than 5.0 m² and a minimum width of 1.8 m. The kitchen height (12.3.1) is not less than 2.75 m, the same as a habitable room. Checked on page 44 of Part 3.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc3#12.4.1",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "Cl. 12.4.1",
+  "heading": "Height of bathrooms and water-closets",
+  "text": "12.4.1 Height of bathrooms and water-closets\nIn NBC 2016, the height of a bathroom, toilet or water-closet (WC), measured from the surface of the floor to the lowest point of the ceiling (bottom of the slab), shall be not less than 2.1 m. This is lower than the 2.75 m required for habitable rooms. Checked on page 44 of Part 3.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc3#12.4.2",
+  "code_id": "nbc3",
+  "code": "NBC 2016 Part 3",
+  "code_norm": "nbcp3",
+  "clause": "Cl. 12.4.2",
+  "heading": "Size of bathrooms and water-closets",
+  "text": "12.4.2 Size of bathrooms and water-closets\nIn NBC 2016, a bathroom shall have an area of not less than 1.8 m² with a minimum width of 1.2 m, and a water-closet (WC, toilet) shall have a floor area of 1.1 m² with a minimum width of 0.9 m. A combined bath and water-closet has its own larger minimum. Checked on page 44 of Part 3.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#preamble",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "",
+  "heading": "NBC 2016 Part 4 — Fire and Life Safety (checked facts)",
+  "text": "NBC 2016 Part 4 — Fire and Life Safety (checked facts)\nNOTE — Values summarised in Aptimizer's own words from NBC 2016 Volume 1, checked page by page in Phase II testing. Page numbers are the printed page numbers of Part 4. This is not the text of the Code. NBC 2016 has since been replaced by SP 7:2026; these are the NBC 2016 values.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#2.38",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Cl. 2.38",
+  "heading": "High rise building",
+  "text": "2.38 High rise building\nIn NBC 2016, a high rise building is a building 15 m or above in height, irrespective of its occupancy. Height is the trigger for the high rise fire provisions of Part 4, such as two staircases, the firefighting shaft with fire lift (Annex E-2) and refuge areas above 24 m (Annex E-4). Checked on page 11 of Part 4.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#4.4.2.4.1",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Cl. 4.4.2.4.1",
+  "heading": "Doorways",
+  "text": "4.4.2.4.1 Doorways\nNo exit doorway shall be less than 1 000 mm wide, except in assembly buildings, where it shall be not less than 2 000 mm. Doorways shall be not less than 2 000 mm high. A revolving door is considered capable of exiting only 50 persons; a hinged door with the same exiting capacity must be provided in the same wall within 3 m of it; and doors shall not be located within 3 m of the foot or top of stairs or escalators. Checked on page 32.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#4.4.2.4.2",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Cl. 4.4.2.4.2",
+  "heading": "Corridors and passageways",
+  "text": "4.4.2.4.2 Corridors and passageways\nCorridors and passageways shall be at least as wide as the aggregate width of the exit doorways leading from them in the direction of travel to the exit; no fixed minimum width is given here. In buildings with a central corridor that is part of exit access, room doors (except assembly rooms) shall open inwards. Checked on pages 32 and 33.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#4.4.2.4.3.1",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Cl. 4.4.2.4.3.1",
+  "heading": "Staircases, general",
+  "text": "4.4.2.4.3.1 Staircases, general\nEvery building referred to in 1.2 (high rise and the other listed buildings) shall have a minimum of two staircases. At least 50 percent of the staircases shall discharge directly or through an exit passageway. Minimum tread without nosing: 250 mm for residential buildings, 300 mm for assembly, hotels, educational, institutional, business and other buildings. Maximum riser: 190 mm for residential buildings (A-2), 150 mm for other buildings. Not more than 12 risers per flight. Checked on page 33.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#4.4.2.4.3.2",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Cl. 4.4.2.4.3.2",
+  "heading": "Internal staircases",
+  "text": "4.4.2.4.3.2 Internal staircases\nInternal stairs shall be of non-combustible materials with a fire resistance rating of at least 120 min. A staircase shall not be arranged round a lift shaft. Minimum staircase widths: residential A-2, 1.00 m (0.75 m for two-storey row housing); residential A-1, A-3 and A-4 (apartments), 1.25 m. Checked on page 33.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#table-5",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Table 5",
+  "heading": "Travel distance",
+  "text": "Table 5 Travel distance\nMaximum travel distance for residential buildings (Group A): 30.00 m for construction Types 1 and 2, 22.50 m for Types 3 and 4. For a fully sprinklered building the travel distance may be increased by 50 percent. Checked on page 32.",
+  "kind": "table",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#annex-e",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Annex E",
+  "heading": "2 Firefighting shaft",
+  "text": "Annex E-2 Firefighting shaft\nOne firefighting shaft, with its staircase and fire lift lobby, shall be planned for each residential building or tower (Annex E applies to high rise buildings, 15 m and above). Checked on page 87.",
+  "kind": "annex",
+  "merged": []
+ },
+ {
+  "chunk_id": "nbc4#annex-e-2",
+  "code_id": "nbc4",
+  "code": "NBC 2016 Part 4",
+  "code_norm": "nbcp4",
+  "clause": "Annex E",
+  "heading": "4 Refuge area",
+  "text": "Annex E-4 Refuge area\nRefuge area shall be provided in buildings more than 24 m high, at or immediately above 24 m and thereafter at every 15 m or so, sized at 0.3 m² per person for the occupants of two consecutive floors plus wheelchair space. High rise apartment buildings whose apartments have balconies need not provide refuge areas, but above 60 m such buildings shall provide refuge areas at 60 m and thereafter every 30 m. Checked on page 88.",
+  "kind": "annex",
+  "merged": []
+ }
+]

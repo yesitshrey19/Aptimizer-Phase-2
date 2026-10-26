@@ -1,0 +1,21 @@
+{
+ "embed_model": "gemini-embedding-001",
+ "dimension": 3072,
+ "chunk_count": 15,
+ "built_at": "2026-10-26T21:25:19Z",
+ "files": {
+  "nbc3.md": "5905a4e70d6873f20dfea9e98167c63bb7583441b8796ab7a033b4ae5e69c299",
+  "nbc4.md": "032b9ad4126be153505ae0fe1a5ab24f6b054f2990c24fd82bbc48f52be0cb5a"
+ },
+ "vectors": true,
+ "chunk_spans": {
+  "nbc3.md": [
+   0,
+   6
+  ],
+  "nbc4.md": [
+   6,
+   15
+  ]
+ }
+}

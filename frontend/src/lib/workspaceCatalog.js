@@ -1,6 +1,6 @@
-// Aptimizer catalogue: Stage 1 (Site) plus the stages added so far (Stage 4: Cost & Procurement). Shared by navigation and the public directory.
+// Aptimizer catalogue: Stage 1 (Site) plus the stages added so far (Stage 4: Cost & Procurement; Stage 5: Reports & Compliance). Shared by navigation and the public directory.
 // Parameter labels reflect the actual module inputs/outputs; the directory is a curated index, not certification.
-import { Box, Building2, CalendarClock, Calculator, Car, ClipboardList, DraftingCompass, FileText, Globe2, Landmark, Map, Ruler, Shapes, ShoppingCart, Sparkles, TrendingUp, Wallet } from "lucide-react";
+import { Box, Building2, CalendarClock, Calculator, Car, ClipboardList, DraftingCompass, FileText, Gauge, Globe2, Landmark, Leaf, Map, Ruler, Shapes, ShieldCheck, ShoppingCart, Sparkles, TrendingUp, Wallet } from "lucide-react";
 
 const input = (name, unit, basis) => ({ name, unit, basis, kind: "Input" });
 const computed = (name, unit, basis) => ({ name, unit, basis, kind: "Calculated" });
@@ -321,6 +321,60 @@ export const WORKSPACE_CATALOG = [
     ] },
   ] },
 
+  { id: "reports-compliance", label: "Reports & Compliance", icon: ShieldCheck, modules: [
+    { id: "compliance", name: "Compliance", icon: ShieldCheck, note: "Rule-by-rule checks and remaining headroom.", parameters: [
+      input("Byelaw thresholds", "rule-specific", "Authority-specific limits and enabled rules."),
+      input("Rule parameter, operator & enablement", "selection", "Which computed value a rule tests, whether it is a min or max, and whether the rule is active."),
+      input("Custom compliance rule creation (code, label, threshold & unit)", "text / number", "User-defined custom byelaw rules added to the project's compliance rule set."),
+      computed("Pass/fail & headroom", "checks / ratio", "Configured checks are not statutory approval."),
+      computed("Per-rule actual vs. threshold comparison", "value / status", "Live evaluated actual project value compared against the configured min/max threshold for every rule."),
+      computed("Rules evaluated, passed & failed", "count", "Summary of the active rule set."),
+      computed("Violation messages & clause references", "text", "Each failure with the governing clause, where one is modelled."),
+      computed("Compliance score", "%", "Share of active rules that pass."),
+      estimate("AI compliance review", "text", "Plain-language explanation of each failing rule, its statutory intent, and specific design changes to achieve compliance."),
+    ] },
+    { id: "urban-sustainability", name: "Green Building & ESG", icon: Leaf, note: "Carbon, sustainability and resilience scenarios.", parameters: [
+      input("Green checklist & material factors", "points / factors", "Project evidence and emission factors."),
+      input("Green certification standard selector (IGBC / GRIHA / LEED v4.1)", "standard", "Selects the green building rating framework (IGBC, GRIHA, or LEED) used to evaluate the project scorecard."),
+      estimate("Embodied carbon & green score", "tCO₂e / points", "Indicative assessment, not IGBC or GRIHA certification."),
+      estimate("Green certification tier, energy savings & potable water reduction", "tier / %", "Predicted certification tier (Silver, Gold, Platinum, or star rating), total vs. max points by credit category, estimated energy savings, and potable water reduction."),
+      computed("Scope 1, 2 & 3 greenhouse gas accounting", "tCO₂e", "Operational and embodied emissions split by scope."),
+      computed("Carbon intensity", "kgCO₂e / m²", "Total footprint per unit of built-up area."),
+      computed("Annual solar irradiation", "kWh / m² / yr", "Location-based solar resource used by the renewables scenario."),
+      computed("30-year lifecycle cost & opex", "INR", "Initial capex plus operating and periodic rehabilitation cost."),
+      computed("Lifecycle Capex-to-Opex ratio & Net Present Value (NPV @ 8%)", "ratio / INR", "30-year Capex vs. Opex ratio and discounted lifecycle Net Present Value at 8% discount rate."),
+      computed("Resilience score & ESG rating", "/100 / rating", "Composite hazards, infrastructure and worker-welfare assessment."),
+      estimate("Multi-hazard disaster risk matrix & structural mitigations", "risk level / zone / mitigation", "Hazard-by-hazard vulnerability rating (seismic, flood, wind, urban heat), zone classification, and structural mitigation measures."),
+      estimate("Acoustic attenuation & CPCB daytime noise compliance", "dB(A) / glazing spec", "Curb noise level vs. setback-attenuated front-facade noise level, CPCB daytime residential limit check, and acoustic glazing recommendation."),
+      estimate("Ambient air quality (PM2.5 & PM10) & particulate mitigation strategy", "µg/m³ / strategy", "Site ambient PM2.5 and PM10 concentrations, air quality status, and vegetative buffer/dispersion mitigations."),
+      computed("Capital rehabilitation schedule", "INR / years", "Planned periodic renewal of building systems."),
+      computed("Land value projection", "INR / CAGR", "Current plotted value and the projected 5-year appreciation."),
+      estimate("Base land rate, 5-year appreciation table, infrastructure & growth catalysts", "INR/m² / % gain / status", "Current base land rate, year-by-year projected land rate and cumulative capital gain, civic infrastructure adequacy, and transit/zoning value catalysts."),
+      estimate("Executive portfolio KPIs (Equity Multiple, GDV, Clearance Index & Safety Factor)", "× / INR / % / factor", "Executive synthesis metrics including project health status, developer IRR, equity multiple, Gross Development Value, gross margin, statutory clearance index, and structural safety factor."),
+      estimate("Heavy equipment utilization & multi-factor delay risk buffer", "qty / % / +days", "Allocated equipment fleet utilization, weather/labour/supply-chain delay float impacts, recommended float buffer, and schedule confidence index."),
+    ] },
+    { id: "data-health", name: "Data Reliability", icon: Gauge, note: "Completeness, freshness and consistency.", parameters: [
+      computed("Overall data reliability score & 4-pillar breakdown", "/100", "Composite reliability score and individual 0–100 scores for Completeness, Freshness, Consistency, and Compliance against the 80/100 target threshold."),
+      computed("Input coverage & stale results", "% / status", "Checks input availability and version consistency, not engineering correctness."),
+      computed("Freshness & consistency artefact state checks", "fresh / stale / ok / mismatch", "Itemised freshness and cross-module consistency checks across plot polygon, packed layout, planning towers, and GIS."),
+      computed("Mismatches & missing inputs", "count", "Values that disagree with their source and inputs the engine had to fall back on."),
+      computed("Failed compliance rules count", "count", "Count of active compliance rules currently failing, displayed alongside stale artefacts, mismatches, and missing inputs."),
+      computed("Engineering warnings & critical findings count by module", "critical / warning count", "Stacked bar breakdown of critical and warning engineering flags raised per module."),
+      computed("Reliability scores by source", "%", "Freshness and consistency per data source."),
+      computed("Compliance headroom", "ratio", "Distance between computed values and their configured limits."),
+    ] },
+    { id: "project-reports", name: "Project Reports", icon: FileText, note: "Project documents and quantity workbooks.", parameters: [
+      input("AI 3D render view style selector", "3D Isometric / Exterior / Interior", "Selects the architectural visualization view type for AI rendering."),
+      computed("Executive snapshot strip (8 headline project metrics)", "m² / units / FAR / spaces / INR / checks", "Summary grid embedded in all reports: plot area, built-up area, units, FAR/FSI, parking required/provided, total cost, cost per flat, and compliance score."),
+      computed("Project reports & BOQ workbook", "PDF / XLSX", "Generated project snapshots; engineer review required."),
+      computed("19 domain-specific PDF dossiers & combined master PDF", "PDF", "Individual PDF reports for every workspace discipline plus a single combined master PDF."),
+      computed("Drawing exports", "PNG", "High-resolution site and 3D render exports of the current scheme."),
+      computed("CAD exchanges", "DXF / DWG / IFC4", "Model and drawing exports produced from the current project data."),
+      computed("Tower floor plan sheets", "PDF", "Saved floor plans included in the report set."),
+      estimate("All tower floor plans ZIP archive & AI 3D architectural renders", "ZIP / PNG / prompt", "Batch .zip archive of all tower 2D floor plans and AI-generated 3D isometric, exterior, and interior renders per tower."),
+      computed("AI executive summary", "text", "Generated narrative; depends on the configured AI service and is not an approval."),
+    ] },
+  ] },
 ];
 export const WORKSPACE_MODULES = WORKSPACE_CATALOG.flatMap(group => group.modules);
 export const PARAMETER_COUNT = WORKSPACE_MODULES.reduce((total, module) => total + module.parameters.length, 0);

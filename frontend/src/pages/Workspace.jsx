@@ -30,6 +30,9 @@ const CostModule = lazy(() => import("../modules/CostModule"));
 const ProcurementMarketModule = lazy(() => import("../modules/ProcurementMarketModule"));
 const ProgrammeModule = lazy(() => import("../modules/ProgrammeModule"));
 const FinanceModule = lazy(() => import("../modules/FinanceModule"));
+const ComplianceModule = lazy(() => import("../modules/ComplianceModule"));
+const DataHealthModule = lazy(() => import("../modules/DataHealthModule"));
+const ReportsModule = lazy(() => import("../modules/ReportsModule"));
 
 const COMPONENTS = {
   plot: SiteModule, gis: GisModule, township: TownshipModule, reports: SiteReportsModule,
@@ -38,6 +41,7 @@ const COMPONENTS = {
   calculations: CalculationsModule, engineering: EngineeringModule,
   boq: BoqModule, cost: CostModule, procurement: ProcurementMarketModule,
   programme: ProgrammeModule, finance: FinanceModule,
+  compliance: ComplianceModule, "data-health": DataHealthModule, "project-reports": ReportsModule,
 };
 const GROUPS = WORKSPACE_CATALOG.map(g => [g.id, g.label, g.modules.map(m => [m.id, m.name, m.icon, COMPONENTS[m.id]])]);
 

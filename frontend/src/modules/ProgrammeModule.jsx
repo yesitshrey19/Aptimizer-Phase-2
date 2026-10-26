@@ -223,6 +223,7 @@ export default function ProgrammeModule({ project, projectId, readOnly, setProje
     start_date: new Date().toISOString().slice(0, 10),
     target_finish: "",
     mobilisation_days: 10,
+    towers_at_once: 0,
     blockwork_lag_floors: 2,
     crews: {},
     extra_tasks: [],
@@ -535,6 +536,8 @@ export default function ProgrammeModule({ project, projectId, readOnly, setProje
           <NumField label="Site setup (days)" value={cfg.mobilisation_days} disabled={readOnly}
             onChange={(v) => set("mobilisation_days", v)} testid="prog-mobilisation-input"
             hint="Site setup before building starts: offices, fencing, water, power." />
+          <NumField label="Towers built at a time (0 = all)" value={cfg.towers_at_once ?? 0} disabled={readOnly}
+            onChange={(v) => set("towers_at_once", v)} testid="prog-phasing-input" />
           <NumField label="Masonry starts after (floors)" value={cfg.blockwork_lag_floors} disabled={readOnly}
             onChange={(v) => set("blockwork_lag_floors", v)} testid="prog-blocklag-input"
             hint="Floors the frame stays ahead of wall work. Higher is safer, slower." />

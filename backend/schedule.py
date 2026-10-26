@@ -738,6 +738,10 @@ class ScheduleConfig:
     # only the crew and the days still recompute from the quantity, which is the arithmetic
     # that makes this a planning engine rather than a spreadsheet.
     task_overrides: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    # Towers built at once; 0 = all in parallel. Developers phase large schemes (Sterling
+    # Infinia declared ~82 months for 7 towers to RERA; the all-parallel plan was 25), so a
+    # tower beyond the first N waits for the tower N places ahead to top out.
+    towers_at_once: int = 0
     blockwork_lag_floors: int = 2       # blockwork trails the structure by this many floors
     finishing_lag_floors: int = 2       # finishes trail blockwork likewise
     mobilisation_days: int = 10
@@ -784,6 +788,7 @@ class ScheduleConfig:
                 "extra_tasks": [dict(t) for t in self.extra_tasks],
                 "excluded_tasks": list(self.excluded_tasks),
                 "task_overrides": {k: dict(v) for k, v in self.task_overrides.items()},
+                "towers_at_once": self.towers_at_once,
                 "blockwork_lag_floors": self.blockwork_lag_floors,
                 "finishing_lag_floors": self.finishing_lag_floors,
                 "mobilisation_days": self.mobilisation_days,
@@ -879,10 +884,16 @@ def build_activities(project: Dict[str, Any], analysis: Dict[str, Any],
     sub_conc = concrete_t * SUBSTRUCTURE_CONCRETE_SHARE
     super_conc = concrete_t - sub_conc
 
+    top_slab = []                     # each tower's last slab cast, for phasing
     for ti, t in enumerate(towers):
         tid = f"t{ti}"
         tname = t.get("name") or f"Tower {ti + 1}"
         floors = max(int(t.get("floors") or 1), 1)
+        top_slab.append(f"{tid}_slabcast_{floors}")
+        k = int(cfg.towers_at_once or 0)
+        exc_deps = [Dep("clearing")]
+        if k > 0 and ti >= k:
+            exc_deps.append(Dep(top_slab[ti - k], reason=f"phasing: {k} tower(s) at a time"))
         plate = float(t.get("builtup_per_floor_sqm") or 0) or (
             float(t.get("builtup_sqm") or 0) / floors)
         tower_share = (float(t.get("builtup_sqm") or 0) / total_builtup) if total_builtup else 0
@@ -904,7 +915,7 @@ def build_activities(project: Dict[str, Any], analysis: Dict[str, Any],
         # ---- Phase 2: substructure --------------------------------------------------
         add(f"{tid}_exc", f"{tname}: excavation", "Substructure", trade="excavation",
             qty=foot * 1.8, unit="m3", out=OUTPUTS["excavation_m3"], crew_key="concretor",
-            crew_default=1, exposed=True, deps=[Dep("clearing")], tower=tname)
+            crew_default=1, exposed=True, deps=exc_deps, tower=tname)
         add(f"{tid}_pcc", f"{tname}: PCC bed", "Substructure", trade="concretor",
             qty=t_sub_conc * 0.12, unit="m3", out=OUTPUTS["pcc_m3"], crew_key="concretor",
             crew_default=2, mat_rate=r_conc, deps=[Dep(f"{tid}_exc")], tower=tname)

@@ -50,7 +50,9 @@ def plan_equipment(project: Dict[str, Any], boq: Optional[Dict[str, Any]] = None
     
     # 1. TOWER CRANES (IS 4573)
     # 1 crane per tower or every 45m radius footprint cluster
-    tower_cranes_count = num_towers
+    # A tower crane earns its erection cost from about 5 storeys; low-rise blocks are
+    # served by a mobile crane on hire (Phase II Stage 4 observation).
+    tower_cranes_count = num_towers if max_floors >= 5 else 0
     crane_hook_height_m = round(building_height_m + 12.0, 1)  # 12m clearance above parapet
     crane_jib_radius_m = min(max(round(math.sqrt(total_builtup_sqm / max_floors) * 0.8, 0), 40.0), 65.0)
     crane_tip_capacity_mt = 2.0 if crane_jib_radius_m > 50 else 2.5
@@ -106,7 +108,8 @@ def plan_equipment(project: Dict[str, Any], boq: Optional[Dict[str, Any]] = None
         {
             "category": "Lifting & Craneage",
             "name": f"Tower Crane (Topless / Luffing Jib)",
-            "specification": f"Hook height {crane_hook_height_m}m, Jib {crane_jib_radius_m}m, Tip {crane_tip_capacity_mt}t / Max {crane_max_capacity_mt}t",
+            "specification": (f"Hook height {crane_hook_height_m}m, Jib {crane_jib_radius_m}m, Tip {crane_tip_capacity_mt}t / Max {crane_max_capacity_mt}t"
+                              if tower_cranes_count else "Not needed up to 4 floors: mobile crane on hire for lifts"),
             "quantity": tower_cranes_count,
             "unit": "Units",
             "power_kw": tower_cranes_count * 55.0,

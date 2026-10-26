@@ -447,7 +447,11 @@ def services_items(project, areas, park=None):
     tall = max((float(t.get("height_m") or 0) for t in towers), default=0.0)
     basement = 0.0
     if park:
-        basement = float(park.get("basement_slots") or 0) * float(park.get("area_per_slot_actual") or 0)
+        # The bays actually needed below ground: at least the required parking not met at
+        # grade. Pricing only the configured default (72 bays) under-sized P4's basement.
+        bays = max(float(park.get("basement_slots") or 0),
+                   float(park.get("required_slots") or 0) - float(park.get("ground_slots") or 0))
+        basement = bays * float(park.get("area_per_slot_actual") or park.get("benchmark_area_per_ecs_sqm") or 0)
     open_site = max(float(areas.get("plot_area_sqm") or 0) - float(areas.get("ground_footprint_sqm") or 0), 0.0)
     built_amenity = math.fsum(float(a.get("area") or 0) for a in project.get("society_amenities") or []
                               if not any(w in str(a.get("name", "")).lower() for w in OPEN_AIR_AMENITY_WORDS))

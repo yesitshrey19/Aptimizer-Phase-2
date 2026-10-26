@@ -430,7 +430,7 @@ PARKING = {
 # ---------------------------------------------------------------- NBC fire
 # ---------------------------------------------------------------- NBC Part 4 / SP 7 fire
 _FIRE_NBC_2016 = {
-    # NBC 2016 Part 4 Table 4 gives 30 m for Group A-2 residential. This was previously
+    # NBC 2016 Part 4 Table 5 (p. 32, read 27 Oct) gives 30 m for residential, Types 1-2. This was previously
     # 22.5 m here while engine.DEFAULT_RULES used 30 m, so the same project could pass
     # Compliance and fail Fire Safety on one number. Both now read this key.
     "max_travel_m": 30.0,

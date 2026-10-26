@@ -1,5 +1,6 @@
 """Civil engineering calculation engine. Pure functions over a project document."""
 import math
+import re
 from input_validation import validate_project
 from calculation_basis import calculation_basis
 from decimal import Decimal, ROUND_HALF_UP
@@ -623,7 +624,7 @@ DEFAULT_RULES = [
     {"id": "fsi_max", "code": "FSI-01", "label": "Maximum permissible FSI", "param": "fsi", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True},
     {"id": "ground_coverage", "code": "GC-01", "label": "Maximum ground coverage", "param": "ground_coverage_pct", "operator": "max", "threshold": 40.0, "unit": "%", "enabled": True},
     {"id": "open_space", "code": "OS-01", "label": "Minimum open space", "param": "open_space_pct", "operator": "min", "threshold": 30.0, "unit": "%", "enabled": True},
-    {"id": "stair_width", "code": "NBC-STR", "label": "Minimum staircase width", "param": "min_stair_width", "operator": "min", "threshold": 1.5, "unit": "m", "enabled": True},
+    {"id": "stair_width", "code": "NBC-STR", "label": "Minimum staircase width", "param": "min_stair_width", "operator": "min", "threshold": iscodes.FIRE["stair_min_width_m"], "unit": "m", "enabled": True},
     {"id": "corridor_width", "code": "NBC-COR", "label": "Minimum corridor width (means of egress)", "param": "min_corridor_width", "operator": "min", "threshold": iscodes.FIRE["corridor_min_m"], "unit": "m", "enabled": True},
     {"id": "lift_ratio", "code": "LFT-01", "label": "Minimum lifts per tower (>= floors/8)", "param": "lift_shortfall", "operator": "max", "threshold": 0, "unit": "nos", "enabled": True},
     {"id": "fire_exits", "code": "FIR-01", "label": "Minimum fire exits per floor", "param": "min_exits_per_floor", "operator": "min", "threshold": 2, "unit": "nos", "enabled": True},
@@ -632,6 +633,26 @@ DEFAULT_RULES = [
     {"id": "accessible_parking", "code": "ACC-02", "label": "Minimum accessible parking", "param": "accessible_parking_pct", "operator": "min", "threshold": 2.0, "unit": "%", "enabled": True},
     {"id": "parking_provision", "code": "PRK-01", "label": "Parking provided vs required", "param": "parking_deficit", "operator": "max", "threshold": 0, "unit": "nos", "enabled": True},
 ]
+
+
+# Which entry of iscodes.CLAUSES each default rule rests on, so every verdict carries the
+# clause and code edition it was checked against (Phase II S5-001: rules showed only an
+# internal id). Rules with no entry here have no clause the app has read from the book yet;
+# they say so rather than borrow a plausible-looking reference.
+RULE_BASIS = {
+    "stair_width": "fire_stairs", "fire_exits": "fire_stairs", "travel_distance": "fire_travel",
+    "ramp_slope": "parking_ramp", "accessible_parking": "parking_accessible",
+    "parking_provision": "parking_ecs",
+}
+
+
+def rule_reference(rule_id):
+    entry = iscodes.CLAUSES.get(RULE_BASIS.get(rule_id, ""))
+    if not entry:
+        return {"reference": "Clause to be confirmed from the code book", "edition": None, "verified": False}
+    m = re.search(r"(19|20)\d{2}", entry["code"])
+    return {"reference": f"{entry['code']}, {entry['clause']}",
+            "edition": m.group(0) if m else None, "verified": True}
 
 
 def compliance(project, areas, park):
@@ -674,6 +695,7 @@ def compliance(project, areas, park):
             "param": r.get("param"), "operator": r.get("operator"),
             "threshold": threshold, "unit": r.get("unit"), "actual": round(actual, 3),
             "status": "pass" if ok else "fail",
+            **rule_reference(r.get("id")),
             "message": ("Compliant" if ok else
                         f"{r.get('label')}: actual {round(actual, 3)}{r.get('unit', '')} violates "
                         f"{'maximum' if r.get('operator') == 'max' else 'minimum'} {threshold}{r.get('unit', '')}"),

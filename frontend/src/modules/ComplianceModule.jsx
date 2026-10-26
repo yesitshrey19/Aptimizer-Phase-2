@@ -39,6 +39,7 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
                 <span>
                   <span className="font-mono text-xs mr-1">[{r.code}]</span>
                   {r.message}
+                  {r.reference && <span className="text-xs text-red-700"> ({r.reference})</span>}
                 </span>
               </li>
             ))}
@@ -67,7 +68,7 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-24">Code</TableHead>
+              <TableHead className="w-44">Code and clause</TableHead>
               <TableHead>Rule</TableHead>
               <TableHead className="w-44">Parameter</TableHead>
               <TableHead className="w-24">Operator</TableHead>
@@ -82,7 +83,13 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
               const res = resultOf(r.id);
               return (
                 <TableRow key={r.id} data-testid={`rule-row-${r.id}`}>
-                  <TableCell className="py-1.5 font-mono text-xs">{r.code}</TableCell>
+                  <TableCell className="py-1.5 font-mono text-xs">
+                    {r.code}
+                    {res && (
+                      <div className={`font-sans text-[10px] leading-tight mt-0.5 ${res.verified ? "text-slate-500" : "text-amber-700"}`}
+                        data-testid={`rule-ref-${r.id}`}>{res.reference}</div>
+                    )}
+                  </TableCell>
                   <TableCell className="py-1.5">
                     <Input disabled={readOnly} className="h-8 text-xs rounded-sm" data-testid={`rule-label-${r.id}`}
                       value={r.label} onChange={(e) => setRule(i, { label: e.target.value })} />

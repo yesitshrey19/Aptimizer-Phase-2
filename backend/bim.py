@@ -201,6 +201,33 @@ def extract_rings(raw) -> List[List[Tuple[float, float]]]:
     return out
 
 
+def _footprint_sqm(t: Dict) -> Optional[float]:
+    """Layout towers carry footprint_sqm; towers typed on the Planning tab carry
+    footprint_area. Reading only the first drew typed towers as 20 m squares and
+    labelled them '?' in the DXF (Phase II S5-013)."""
+    for key in ("footprint_sqm", "footprint_area"):
+        try:
+            v = float(t.get(key) or 0)
+        except (ValueError, TypeError):
+            continue
+        if v > 0:
+            return round(v, 2)
+    return None
+
+
+def _placed(towers: List[Dict]) -> List[Dict]:
+    """Towers with neither polygons nor a position are set side by side, 6 m apart,
+    instead of all being drawn on top of one another at the origin."""
+    out, x_next = [], 0.0
+    for t in towers:
+        if not extract_rings(t.get("polygons_local")) and not t.get("centre_local"):
+            side = math.sqrt(_footprint_sqm(t) or 400.0)
+            t = {**t, "centre_local": [x_next + side / 2.0, 0.0]}
+            x_next += side + 6.0
+        out.append(t)
+    return out
+
+
 def _tower_fallback_ring(t: Dict) -> List[Tuple[float, float]]:
     """Synthesize a rectangular footprint if a tower lacks explicit polygons."""
     c = t.get("centre_local") or [0.0, 0.0]
@@ -216,12 +243,9 @@ def _tower_fallback_ring(t: Dict) -> List[Tuple[float, float]]:
             d = float(t["depth_m"])
         except (ValueError, TypeError):
             pass
-    elif t.get("footprint_sqm"):
-        try:
-            side = math.sqrt(float(t["footprint_sqm"]))
-            w, d = side, side
-        except (ValueError, TypeError):
-            pass
+    elif _footprint_sqm(t):
+        side = math.sqrt(_footprint_sqm(t))
+        w, d = side, side
     hw, hd = max(2.0, w / 2.0), max(2.0, d / 2.0)
     return [
         (cx - hw, cy - hd),
@@ -248,7 +272,7 @@ def export_siteplan_dxf(project: Dict) -> bytes:
     plot = (project.get("plot") or {})
     coords = plot.get("coordinates") or []
     layout = project.get("site_layout") or {}
-    towers = layout.get("towers") or project.get("towers") or []
+    towers = _placed(layout.get("towers") or project.get("towers") or [])
     surface_parking = layout.get("surface_parking") or {}
     bays_raw = surface_parking.get("polygons_local") or []
 
@@ -282,7 +306,7 @@ def export_siteplan_dxf(project: Dict) -> bytes:
             cx, cy = float(c[0]), float(c[1])
         except Exception:
             cx, cy = 0.0, 0.0
-        label = f"{t.get('name', 'Tower')}  {t.get('floors', '?')}F  {t.get('footprint_sqm', '?')} m2"
+        label = f"{t.get('name', 'Tower')}  {t.get('floors', '?')}F  {_footprint_sqm(t) or '?'} m2"
         msp.add_text(label, dxfattribs={"layer": "A-ANNO-TXT", "height": 2.0}).set_placement(
             (cx, cy), align=TextEntityAlignment.MIDDLE_CENTER)
 
@@ -292,9 +316,24 @@ def export_siteplan_dxf(project: Dict) -> bytes:
             msp.add_lwpolyline(pts, close=True, dxfattribs={"layer": "A-PARK-BAYS"})
 
     metrics = layout.get("layout_metrics") or {}
-    title = (f"{project.get('name', 'Site plan')}  |  plot {plot.get('area_sqm') or '?'} m2  |  "
-             f"towers {metrics.get('tower_count', len(towers))}  |  units {metrics.get('unit_count', '?')}  |  "
-             f"coverage {metrics.get('ground_coverage_pct', '?')}%")
+    # Without a generated layout the title showed '?' for numbers the app shows on
+    # screen; take them from the same analysis the Planning tab uses.
+    areas = {}
+    if not (plot.get("area_sqm") and metrics.get("unit_count") is not None
+            and metrics.get("ground_coverage_pct") is not None):
+        try:
+            import engine
+            areas = engine.analyse(project)["areas"]
+        except Exception:
+            areas = {}
+    plot_area = plot.get("area_sqm") or (round(areas["plot_area_sqm"], 2) if areas.get("plot_area_sqm") else "?")
+    units = metrics.get("unit_count", areas.get("total_units", "?"))
+    coverage = metrics.get("ground_coverage_pct")
+    if coverage is None:
+        coverage = round(areas["ground_coverage_pct"], 2) if "ground_coverage_pct" in areas else "?"
+    title = (f"{project.get('name', 'Site plan')}  |  plot {plot_area} m2  |  "
+             f"towers {metrics.get('tower_count', len(towers))}  |  units {units}  |  "
+             f"coverage {coverage}%")
     msp.add_text(title, dxfattribs={"layer": "A-ANNO-TXT", "height": 3.0}).set_placement(
         (0.0, -8.0), align=TextEntityAlignment.MIDDLE_CENTER)
     try:
@@ -426,7 +465,7 @@ def export_ifc4(project: Dict) -> bytes:
             pass
 
     layout = project.get("site_layout") or {}
-    towers = layout.get("towers") or project.get("towers") or []
+    towers = _placed(layout.get("towers") or project.get("towers") or [])
 
     for t in towers:
         rings = extract_rings(t.get("polygons_local"))
@@ -440,7 +479,7 @@ def export_ifc4(project: Dict) -> bytes:
         if len(ring) < 3:
             continue
         floors = max(1, int(t.get("floors") or 1))
-        fh = float(t.get("floor_height_m") or 3.0)
+        fh = float(t.get("floor_height_m") or t.get("floor_height") or 3.0)
         name = t.get("name") or "Tower"
         bldg = ifcopenshell.api.run("root.create_entity", model, ifc_class="IfcBuilding", name=name)
         ifcopenshell.api.run("aggregate.assign_object", model, relating_object=site, products=[bldg])
@@ -499,7 +538,7 @@ def _add_extruded(model, body_ctx, name, ring, height, ifc_class="IfcSlab",
 def ifc_summary(project: Dict) -> Dict:
     """What an export would contain — shown before the user clicks download."""
     layout = project.get("site_layout") or {}
-    towers = layout.get("towers") or project.get("towers") or []
+    towers = _placed(layout.get("towers") or project.get("towers") or [])
     return {
         "schema": "IFC4",
         "viewer_hint": "Revit: Insert > Link IFC. Free viewers: BIMvision, usBIM.viewer, Solibri Anywhere.",
@@ -515,7 +554,7 @@ def ifc_summary(project: Dict) -> Dict:
 def dxf_summary(project: Dict) -> Dict:
     """What the DXF export would contain, for the pre-download card."""
     layout = project.get("site_layout") or {}
-    towers = layout.get("towers") or project.get("towers") or []
+    towers = _placed(layout.get("towers") or project.get("towers") or [])
     surface_parking = layout.get("surface_parking") or {}
     bays = extract_rings(surface_parking.get("polygons_local") or [])
     return {

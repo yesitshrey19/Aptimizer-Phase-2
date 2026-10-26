@@ -73,6 +73,11 @@ _FULL_TERMS = (
     "optimis", "optimiz", "waste", "material", "solar", "tree", "plantation",
     "stp", "rwh", "tank", "water", "fire", "accessib", "lift", "stair",
     "revision", "version", "compare", "changed",
+    # Engineering words that carried no other trigger, so these questions went to the light
+    # tier without the engineering state and the small model invented a base-shear formula
+    # (Phase II S5-020 to 023: "earthquake", "natural period", "response reduction").
+    "earthquake", "natural period", "response reduction", "frame", "wind", "soil",
+    "bearing", "seismic zone", "drift", "ductil", "importance factor", "infill", "concrete",
 )
 _NUMBER = re.compile(r"\d")
 

@@ -60,6 +60,10 @@ def _plot_check(project: Dict[str, Any]) -> Dict[str, Any]:
         # boundary is what lets a whole scheme be read off land the user never owned.
         ("Real boundary, not the placeholder", bool(coords) and not plot.get("is_placeholder")),
         ("Road edges classified", bool(plot.get("road_edges"))),
+        # Setbacks and permissible FAR are read off the abutting road's width; an edge
+        # marked as road with no width passed as complete (Phase II Stage 5).
+        ("Road widths entered", bool(plot.get("road_edges")) and all(
+            float(e.get("width") or 0) > 0 for e in plot.get("road_edges") or [])),
         ("Orientation set", plot.get("orientation_deg") is not None),
     ]
     return _group("plot", "Plot boundary", checks,

@@ -230,3 +230,42 @@ def test_downstream_consumers_still_work():
     englib.analyse_engineering(p, a)
     import schedule as S
     assert S.plan_schedule(p, a, {"start_date": "2026-01-05"}, summary=True)["ok"]
+
+
+# ---------------------------------------------------------------- brickwork
+def test_masonry_is_wall_length_times_clear_height_less_openings():
+    # 620 m2 x 8 floors: 0.35 m of wall per m2 -> 1,736 m; 2.575 m between floor and beam
+    # soffit; 230 mm. 48 homes, each 1 main door, 4 inner doors and 6 windows.
+    m = T.masonry_takeoff(620.0, 8, 2.575, 0.23, 48, 5.0, 6.0)
+    assert m["wall_length_m"] == pytest.approx(1736.0)
+    assert m["gross_m3"] == pytest.approx(1736.0 * 2.575 * 0.23, abs=0.01)
+    per_home = 1.0 * 2.1 + 4 * 0.9 * 2.1 + 6 * 1.2 * 1.2
+    assert m["openings_sqm"] == pytest.approx(per_home * 48, abs=0.1)
+    assert m["net_m3"] == pytest.approx(m["gross_m3"] - per_home * 48 * 0.23, abs=0.01)
+
+
+def test_openings_never_take_out_more_than_the_wall():
+    m = T.masonry_takeoff(10.0, 1, 2.5, 0.23, 500, 5.0, 6.0)
+    assert m["net_m3"] == 0
+
+
+def test_boq_bricks_come_from_the_takeoff_not_55_per_m2():
+    # Phase II S4-012: the flat 55 bricks/m2 gave 481 m3 for this tower, a third of a
+    # blind hand take-off (1,550 m3 with no opening deductions).
+    p = default_project("S4", "QA", "Bengaluru", "S", "o")
+    p["towers"][0]["floors"] = 8
+    p["towers"][0]["floor_height"] = 3.0
+    a = engine.analyse(p)
+    bricks = next(r for r in a["quantities"]["items"] if r["key"] == "bricks")
+    tk = a["quantities"]["takeoff"]
+    assert bricks["source"] == "take-off"
+    assert bricks["quantity"] == pytest.approx(tk["totals_raw"]["masonry_m3"] * T.BRICKS_PER_M3)
+    assert 700 < bricks["quantity"] / T.BRICKS_PER_M3 < 1550
+
+
+def test_ratio_mode_still_uses_the_per_m2_rule():
+    p = default_project("S4", "QA", "Bengaluru", "S", "o")
+    areas = engine.analyse(p)["areas"]
+    q = engine.quantities(p, areas, use_takeoff=False)
+    bricks = next(r for r in q["items"] if r["key"] == "bricks")
+    assert bricks["quantity"] == pytest.approx(55.0 * areas["builtup_area_sqm"])

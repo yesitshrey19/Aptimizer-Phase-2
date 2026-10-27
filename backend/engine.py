@@ -320,9 +320,10 @@ EQUIPMENT = [
 ]
 
 
-# Materials whose quantity follows the STRUCTURE, and so is taken off the designed
-# sections rather than a per-m2 rule. Everything else -- tiles, paint, doors, fixtures --
-# genuinely does scale with floor area or unit count, and keeps its ratio.
+# Materials whose quantity follows the STRUCTURE (and, for bricks, the wall model the loads
+# use), and so is taken off the design rather than a per-m2 rule. Everything else -- tiles,
+# paint, doors, fixtures -- genuinely does scale with floor area or unit count, and keeps
+# its ratio.
 DERIVED_KEYS = {
     "concrete": ("concrete_m3", 1.0),
     "steel": ("steel_kg", 1.0),
@@ -330,6 +331,7 @@ DERIVED_KEYS = {
     "sand": ("sand_m3", 1.0),
     "aggregate": ("aggregate_m3", 1.0),
     "formwork": ("formwork_sqm", 1.0),
+    "bricks": ("bricks_nos", 1.0),
 }
 
 # Cement-sand mortar the take-off's mix design does not see: brick joints and plaster.

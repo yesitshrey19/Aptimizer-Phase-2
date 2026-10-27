@@ -47,6 +47,19 @@ CORE_CONCRETE_SHARE = 0.09
 FOOTING_DEPTH_MIN_M = 0.45
 PCC_THICKNESS_M = 0.10
 
+# Brickwork is measured from the same wall model the loads use (iscodes.WALL_LENGTH_PER_SQM
+# metres of wall per m2 of floor plate), at the designed wall thickness, between floor and
+# beam soffit, less door and window openings. It used to be a flat 55 bricks per m2 of
+# built-up, which gave a third of a blind hand take-off on the same tower (Phase II S4-012)
+# and less than half of what the app's own wall allowance implies.
+# Opening sizes are the common designations (door 10DS21 / 9DS21, window 12W12); the
+# designations are to be confirmed against IS 4021 and IS 1038.
+DOOR_MAIN_SQM = 1.0 * 2.1
+DOOR_INNER_SQM = 0.9 * 2.1
+WINDOW_SQM = 1.2 * 1.2
+OPENING_MIN_DEDUCT_SQM = 0.1     # IS 1200 (Part 3): openings up to 0.1 m2 are not deducted
+BRICKS_PER_M3 = 500.0            # modular bricks per m3 of brickwork, mortar included
+
 
 # ---------------------------------------------------------------- member sizing
 FOOTING_SELF_WEIGHT_PCT = 10.0   # footing + backfill, as a share of the column service load
@@ -271,6 +284,23 @@ def grid_counts(footprint_sqm: float, bay_x_m: float, bay_y_m: float) -> Dict[st
 
 
 # ---------------------------------------------------------------- take-off
+def masonry_takeoff(footprint_sqm: float, floors: int, clear_h_m: float, wall_t_m: float,
+                    units: int, doors_per_unit: float, windows_per_unit: float) -> Dict[str, float]:
+    """Brickwork for one tower, m3: wall length x clear height x thickness, less openings."""
+    length = footprint_sqm * C.WALL_LENGTH_PER_SQM * floors
+    gross = length * clear_h_m * wall_t_m
+    inner_doors = max(doors_per_unit - 1.0, 0.0)
+    per_unit = [(1.0 if doors_per_unit >= 1 else doors_per_unit, DOOR_MAIN_SQM),
+                (inner_doors, DOOR_INNER_SQM), (windows_per_unit, WINDOW_SQM)]
+    opening_sqm = math.fsum(n * a for n, a in per_unit if a > OPENING_MIN_DEDUCT_SQM) * units
+    # Openings cannot take out more wall than there is.
+    deduct = min(opening_sqm * wall_t_m, gross)
+    return {"wall_length_m": round(length, 1), "clear_height_m": round(clear_h_m, 3),
+            "thickness_m": wall_t_m, "gross_m3": round(gross, 2),
+            "openings_sqm": round(opening_sqm, 1), "openings_m3": round(deduct, 2),
+            "net_m3": gross - deduct}
+
+
 def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
     """Concrete, steel, formwork and mix materials, derived per tower from the design.
 
@@ -311,8 +341,13 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
     finishes = float(e["finishes_load_kn_sqm"])
     live = C.LIVE_LOADS["residential_room"]
 
+    ratios = project.get("quantity_ratios") or {}
+    doors_per_unit = float(ratios.get("doors_per_unit") or 5.0)
+    windows_per_unit = float(ratios.get("windows_per_unit") or 6.0)
+    wall_t = float(e["wall_thickness_mm"]) / 1000.0
+
     rows: List[Dict[str, Any]] = []
-    tot = {"concrete_m3": 0.0, "steel_kg": 0.0, "formwork_sqm": 0.0}
+    tot = {"concrete_m3": 0.0, "steel_kg": 0.0, "formwork_sqm": 0.0, "masonry_m3": 0.0}
 
     for t in (areas.get("towers") or []):
         foot = float(t.get("footprint_sqm") or 0)
@@ -368,6 +403,9 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
         fw_beam = g["beam_length_m"] * (2 * max(beam_d - slab_t, 0.05) + beam_w) * floors
         fw_col = 2 * (cb + cd) * clear_h * n_col * floors
 
+        masonry = masonry_takeoff(foot, floors, clear_h, wall_t,
+                                  int(t.get("total_units") or 0), doors_per_unit, windows_per_unit)
+
         concrete = math.fsum((col_c, beam_c, slab_c, core_c, found_c, pcc_c))
         steel = math.fsum((col_steel, beam_steel, slab_steel, core_steel, found_steel))
         formwork = math.fsum((fw_slab, fw_beam, fw_col))
@@ -401,11 +439,13 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
                       "slabs": round(slab_steel), "cores_and_stairs": round(core_steel),
                       "footings": round(found_steel), "total_kg": round(steel)},
             "formwork_sqm": round(formwork, 1),
+            "masonry": masonry,
             "ductile_detailing": ductile,
         })
         tot["concrete_m3"] += concrete_sum
         tot["steel_kg"] += steel
         tot["formwork_sqm"] += formwork
+        tot["masonry_m3"] += masonry["net_m3"]
 
     mix = mix_proportions(int(fck), e["exposure_condition"], int(e["aggregate_size_mm"]),
                           e.get("slump_mm", MIX_BASE_SLUMP_MM), e.get("admixture_water_reduction_pct", 0.0),
@@ -429,6 +469,8 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
             "concrete_m3": round(vol, 2),
             "steel_kg": round(tot["steel_kg"]),
             "formwork_sqm": round(tot["formwork_sqm"], 1),
+            "masonry_m3": round(tot["masonry_m3"], 2),
+            "bricks_nos": round(tot["masonry_m3"] * BRICKS_PER_M3),
             "cement_kg": round(cement_kg_raw),
             "cement_bags": round(cement_kg_raw / 50.0),
             "sand_kg": round(fine_kg_raw),
@@ -441,6 +483,8 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
             "concrete_m3": vol,
             "steel_kg": tot["steel_kg"],
             "formwork_sqm": tot["formwork_sqm"],
+            "masonry_m3": tot["masonry_m3"],
+            "bricks_nos": tot["masonry_m3"] * BRICKS_PER_M3,
             "cement_kg": cement_kg_raw,
             "cement_bags": cement_kg_raw / 50.0,
             "sand_kg": fine_kg_raw,

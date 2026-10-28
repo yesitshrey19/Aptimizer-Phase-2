@@ -52,8 +52,9 @@ PCC_THICKNESS_M = 0.10
 # beam soffit, less door and window openings. It used to be a flat 55 bricks per m2 of
 # built-up, which gave a third of a blind hand take-off on the same tower (Phase II S4-012)
 # and less than half of what the app's own wall allowance implies.
-# Opening sizes are the common designations (door 10DS21 / 9DS21, window 12W12); the
-# designations are to be confirmed against IS 4021 and IS 1038.
+# Opening sizes are the modular IS 1038 designations (door 10DS21 / 9DS21, window 12HS12),
+# checked against the standard's figures on 28 Oct 2026. The frames are 10 mm under the
+# module (990 x 2090, 1180 x 1180 mm); the module size is what is deducted.
 DOOR_MAIN_SQM = 1.0 * 2.1
 DOOR_INNER_SQM = 0.9 * 2.1
 WINDOW_SQM = 1.2 * 1.2

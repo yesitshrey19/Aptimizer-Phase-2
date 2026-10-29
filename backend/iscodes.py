@@ -153,6 +153,11 @@ CLAUSES = {
     # Read 29 Oct 2026 (NBC 2016 Vol 1, Part 3 p. 78): internal corridors 1 500 mm minimum
     # unobstructed, 1 800 mm preferred. BDA RMP 2015 Zoning Regulations Table 24 sets a
     # lower egress floor of 1.2 m for residential stairways/corridors; 1.5 m governs.
+    # Read 29 Oct 2026 (BDA RMP 2015 Zoning Regulations, p. 27). FAR rises with plot size
+    # and road width: 1.75 / 2.25 / 2.50 / 3.00 / 3.25; the app's default 3.0 is the row
+    # for plots of 2,000-4,000 m2 or roads of 24-30 m. Karnataka uses FAR for FSI.
+    "rmp_far": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Table 10 (Residential Main)",
+                "topic": "FAR and ground coverage by plot size and road width"},
     "common_corridor": {"code": "NBC 2016 Part 3", "clause": "Annex B, B-5.2.2",
                         "topic": "Internal corridor 1 500 mm minimum, 1 800 mm preferred (RMP 2015 Table 24: 1.2 m)"},
     "acc_lift": {"code": "IS 3534 / NBC Part 3", "clause": "Cl. 13.7", "topic": "Lift car 1100 × 1400 mm minimum"},

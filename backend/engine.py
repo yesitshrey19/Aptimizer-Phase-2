@@ -649,6 +649,7 @@ RULE_BASIS = {
     "stair_width": "fire_stairs", "fire_exits": "fire_stairs", "travel_distance": "fire_travel",
     "ramp_slope": "parking_ramp", "accessible_parking": "parking_accessible",
     "parking_provision": "parking_ecs", "corridor_width": "common_corridor",
+    "far_max": "rmp_far", "fsi_max": "rmp_far",
 }
 
 

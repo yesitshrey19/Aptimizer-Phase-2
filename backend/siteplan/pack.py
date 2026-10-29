@@ -261,6 +261,71 @@ def _enforce_spacing(towers: List[TowerPlacement],
     return towers, notes
 
 
+def raise_floors(towers: List[TowerPlacement], ctx: PackContext) -> Tuple[List[TowerPlacement], List[str]]:
+    """Give storeys back to low towers while spacing, Note 3 and the FAR cap still allow.
+
+    Each region is packed on its own and the cross-region spacing pass can only take
+    storeys away, so a large plot used to end with one tall tower among blocks of five or
+    six floors and a third of its FAR unused (Phase II replay of Sterling Infinia: FAR 2.05
+    of 3.25). This walks the other way: the lowest tower gains one storey at a time, and the
+    storey is kept only if every gap and the cap still hold.
+    """
+    cfg = ctx.cfg
+    if not towers:
+        return towers, []
+    before = [t.floors for t in towers]
+    area_before = sum(t.floor_area for t in towers)
+    grown = _grow(towers, ctx)
+    # A tall tower can hold its neighbours down for good: the gap it needs grows with its
+    # height. So also try levelling: every tower from the minimum height, grown evenly.
+    kept = [t.floors for t in towers]
+    for t in towers:
+        t.floors = cfg.towers.floors_min
+    _grow(towers, ctx)
+    if sum(t.floor_area for t in towers) <= grown + 1e-6:
+        for t, f in zip(towers, kept):
+            t.floors = f
+    gained = sum(t.floor_area for t in towers) - area_before
+    if gained <= 1e-6:
+        for t, f in zip(towers, before):
+            t.floors = f
+        return towers, []
+    return towers, [f"Re-levelled the towers to {min(t.floors for t in towers)}-"
+                    f"{max(t.floors for t in towers)} storeys, adding {gained:,.0f} m2 of floor "
+                    "area within the spacing rules and the FAR cap."]
+
+
+def _grow(towers: List[TowerPlacement], ctx: PackContext) -> float:
+    """Add storeys lowest-first while every gap, Note 3 and the FAR cap hold. Returns the
+    resulting floor area."""
+    cfg = ctx.cfg
+    cap_area = cfg.far_cap * ctx.plot_area if ctx.plot_area else float("inf")
+    frozen = set()
+
+    def fits(i: int) -> bool:
+        t = towers[i]
+        if sum(x.floor_area for x in towers) > cap_area + 1e-6:
+            return False
+        if ctx.envelope is not None:
+            extra = note3_extra(max(t.width, t.depth), t.height_m)
+            if extra > 0 and not ctx.envelope.buffer(-extra).contains(t.polygon):
+                return False
+        return all(t.polygon.distance(o.polygon) >= required_spacing(t, o, cfg) - 1e-6
+                   for j, o in enumerate(towers) if j != i)
+
+    while True:
+        open_ = [i for i in range(len(towers))
+                 if i not in frozen and towers[i].floors < cfg.towers.floors_max]
+        if not open_:
+            break
+        i = min(open_, key=lambda k: (towers[k].floors, -towers[k].footprint_area))
+        towers[i].floors += 1
+        if not fits(i):
+            towers[i].floors -= 1
+            frozen.add(i)
+    return sum(t.floor_area for t in towers)
+
+
 def _apply_tower_cap(towers: List[TowerPlacement],
                      cfg: SiteLayoutConfig) -> Tuple[List[TowerPlacement], List[str]]:
     """Honour `towers.max_towers`, keeping the highest-yield buildings."""
@@ -291,6 +356,8 @@ def greedy_pack(ctx: PackContext) -> Tuple[List[TowerPlacement], List[str]]:
     towers, n = _apply_tower_cap(towers, ctx.cfg)
     notes += n
     towers, n = _apply_caps(towers, ctx)
+    notes += n
+    towers, n = raise_floors(towers, ctx)
     notes += n
 
     _name(towers)

@@ -10,7 +10,7 @@ from .errors import LayoutError
 from .fitness import FitnessResult, PackContext, TowerPlacement, evaluate
 from .frame import geom_to_latlng, geom_to_local, polygons_of
 from .ga import refine
-from .pack import _name, greedy_pack
+from .pack import _name, greedy_pack, raise_floors
 from .parking import ParkingBay, bays_geometry, generate_bays
 from .reserve import ReserveResult, reserve
 from .version import ENGINE_VERSION, polygon_signature
@@ -170,7 +170,8 @@ def plan(coordinates: Sequence[Sequence[float]],
     if cfg.ga.enabled and towers:
         refined, ga_report = refine(towers, ctx)
         if ga_report.get("improved"):
-            towers = refined
+            towers, raised = raise_floors(refined, ctx)
+            notes += raised
             _name(towers)          # positions moved, so the north-to-south order did too
             method = "genetic"
 

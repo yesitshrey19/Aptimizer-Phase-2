@@ -79,6 +79,36 @@ def _tower_letter(i):
     return f"Tower {chr(65 + i)}" if i < 26 else f"Tower {i + 1}"
 
 
+PLATE_FIT_TOLERANCE = 0.15   # leave the brief alone when it already fills the plate within 15%
+
+
+def fit_units_to_plate(tower, wall_factor=0.10):
+    """Scale the per-floor flat counts so the flats, their walls and the core fill the plate.
+
+    Returns True when the counts changed. A tower whose flats already fill the plate
+    within PLATE_FIT_TOLERANCE, or that has no flats, is left as it is.
+    """
+    units = [u for u in (tower.get("units") or []) if int(u.get("count") or 0) > 0]
+    plate = float(tower.get("footprint_area") or 0)
+    if not units or plate <= 0:
+        return False
+    corridor = float(tower.get("corridor_width") or 0) * float(tower.get("corridor_length") or 0)
+    stairs = sum(float(s.get("width") or 0) ** 2 * 2.6 * int(s.get("count") or 0)
+                 for s in tower.get("staircases") or [])
+    lifts = sum(int(l.get("count") or 0) * 4.5 for l in tower.get("lifts") or [])
+    usable = plate - corridor - stairs - lifts
+    demand = sum(int(u["count"]) * (float(u.get("carpet_area") or 0) + float(u.get("balcony_area") or 0))
+                 for u in units) * (1 + wall_factor)
+    if usable <= 0 or demand <= 0 or abs(usable / demand - 1) <= PLATE_FIT_TOLERANCE:
+        return False
+    scale = usable / demand
+    for u in units:
+        u["count"] = max(1, int(round(int(u["count"]) * scale)))
+    tower["units_per_floor"] = sum(int(u.get("count") or 0) for u in tower.get("units") or [])
+    tower["units_fitted_to_plate"] = True
+    return True
+
+
 def apply_layout_to_tower(tower, engine_tower, name, policy=None, override_floors=False):
     """Stamp one packed block's geometry onto the project tower that represents it.
 
@@ -109,6 +139,12 @@ def apply_layout_to_tower(tower, engine_tower, name, policy=None, override_floor
     w, d = float(engine_tower.get("width_m") or 0), float(engine_tower.get("depth_m") or 0)
     if w > 0 and d > 0:
         tower["plan_length_m"], tower["plan_width_m"] = round(max(w, d), 2), round(min(w, d), 2)
+    # An explicit "Apply site layout" also fills the new plate with flats. The flats per
+    # floor used to stay whatever the brief said, so a 1,260 m2 plate kept 3 flats (715 m2
+    # of carpet) and the scheme reached FAR 2.05 where the plates allowed 3.09 (Phase II
+    # replay of Sterling Infinia). The mix keeps its proportions; only the counts scale.
+    if override_floors and footprint:
+        fit_units_to_plate(tower)
     if (tower.get("parking") or {}).get("basement_only"):
         update_tower_parking(tower, policy)
 

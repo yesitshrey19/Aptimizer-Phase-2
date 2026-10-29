@@ -883,6 +883,8 @@ export default function PlanningModule({ project, analysis, update, readOnly, pr
               onChange={(v) => update((p) => { p.towers[activeIdx].floors = v; p.towers[activeIdx].floors_set_by_user = true; })} testid="tower-floors-input" />
             <NumField label="Floor-to-floor height" suffix="m" step={0.1} value={t.floor_height} disabled={readOnly} onChange={(v) => setT("floor_height", v)} testid="tower-floor-height-input" />
             <NumField label="Typical floor plate footprint" suffix="m²" value={t.footprint_area} disabled={readOnly} onChange={(v) => setT("footprint_area", v)} testid="tower-footprint-input" />
+            <NumField label="Plate length (optional)" suffix="m" step={0.1} value={t.plan_length_m || ""} disabled={readOnly} onChange={(v) => setT("plan_length_m", v)} testid="tower-plan-length-input" />
+            <NumField label="Plate width (optional)" suffix="m" step={0.1} value={t.plan_width_m || ""} disabled={readOnly} onChange={(v) => setT("plan_width_m", v)} testid="tower-plan-width-input" />
             <NumField label="Corridor width" suffix="m" step={0.1} value={t.corridor_width} disabled={readOnly} onChange={(v) => setT("corridor_width", v)} testid="tower-corridor-width-input" />
             <NumField label="Corridor path length" suffix="m" value={t.corridor_length} disabled={readOnly} onChange={(v) => setT("corridor_length", v)} testid="tower-corridor-length-input" />
             <NumField label="Fire exits per floor" value={t.exits_per_floor} disabled={readOnly} onChange={(v) => setT("exits_per_floor", v)} testid="tower-exits-input" />

@@ -106,6 +106,9 @@ def apply_layout_to_tower(tower, engine_tower, name, policy=None, override_floor
     footprint = engine_tower.get("footprint_sqm")
     if footprint:
         tower["footprint_area"] = round(float(footprint), 2)
+    w, d = float(engine_tower.get("width_m") or 0), float(engine_tower.get("depth_m") or 0)
+    if w > 0 and d > 0:
+        tower["plan_length_m"], tower["plan_width_m"] = round(max(w, d), 2), round(min(w, d), 2)
     if (tower.get("parking") or {}).get("basement_only"):
         update_tower_parking(tower, policy)
 

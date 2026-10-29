@@ -269,3 +269,43 @@ def test_ratio_mode_still_uses_the_per_m2_rule():
     q = engine.quantities(p, areas, use_takeoff=False)
     bricks = next(r for r in q["items"] if r["key"] == "bricks")
     assert bricks["quantity"] == pytest.approx(55.0 * areas["builtup_area_sqm"])
+
+
+# ---------------------------------------------------------------- plan shape
+def test_grid_uses_the_plate_length_and_width_when_known():
+    # 31 x 20 m on a 5 m grid: 7 x 5 grid lines, 35 columns, beams 5 x 31 + 7 x 20 = 295 m.
+    g = T.grid_counts(620.0, 5.0, 5.0, 31.0, 20.0)
+    assert (g["nx"], g["ny"], g["columns"]) == (7, 5, 35)
+    assert g["beam_length_m"] == pytest.approx(295.0)
+    assert g["plan_basis"] == "plan dimensions"
+
+
+def test_grid_falls_back_to_the_square_without_dimensions():
+    g = T.grid_counts(620.0, 5.0, 5.0)
+    assert g["lx"] == pytest.approx(g["ly"]) and g["plan_basis"] == "square of equal area"
+
+
+def test_dimensions_are_scaled_to_the_footprint_area():
+    # Dimensions that do not multiply to the footprint keep their shape, not their size.
+    g = T.grid_counts(620.0, 5.0, 5.0, 62.0, 40.0)
+    assert g["lx"] * g["ly"] == pytest.approx(620.0)
+    assert g["lx"] / g["ly"] == pytest.approx(62.0 / 40.0)
+
+
+def test_takeoff_reads_plan_dimensions_from_the_tower():
+    p = default_project("T", "C", "Bengaluru", "S", "o")
+    t = p["towers"][0]
+    t["floors"], t["floor_height"] = 8, 3.0
+    square = T.structural_takeoff(p, engine.analyse(p))["towers"][0]
+    t["plan_length_m"], t["plan_width_m"] = 31.0, 20.0
+    rect = T.structural_takeoff(p, engine.analyse(p))["towers"][0]
+    assert square["columns_per_floor"] == 25 and rect["columns_per_floor"] == 35
+    assert rect["concrete"]["beams"] > square["concrete"]["beams"]
+    assert rect["plan_basis"] == "plan dimensions"
+
+
+def test_site_layout_block_carries_its_length_and_width():
+    from defaults import apply_layout_to_tower, default_tower
+    t = apply_layout_to_tower(default_tower("Tower A"), {"floors": 10, "footprint_sqm": 600,
+                              "width_m": 20.0, "depth_m": 30.0}, "Tower A")
+    assert (t["plan_length_m"], t["plan_width_m"]) == (30.0, 20.0)

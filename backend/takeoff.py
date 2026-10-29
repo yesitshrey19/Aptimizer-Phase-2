@@ -261,26 +261,38 @@ def mix_proportions(grade: int, exposure_key: str, agg_mm: int, slump_mm: float 
 
 
 # ---------------------------------------------------------------- grid geometry
-def grid_counts(footprint_sqm: float, bay_x_m: float, bay_y_m: float) -> Dict[str, float]:
+def grid_counts(footprint_sqm: float, bay_x_m: float, bay_y_m: float,
+                length_m: float = 0.0, width_m: float = 0.0) -> Dict[str, float]:
     """Columns and beam runs implied by a grid over a footprint.
 
-    The plan outline is unknown at this stage, so it is taken as the square of equal area.
-    That is the neutral assumption: any elongated plan of the same area needs slightly more
-    beam length and slightly fewer columns, and the two errors work against each other.
+    When the tower's plan length and width are known (from the site layout, or typed on
+    Apartment Planning) the grid is laid over that rectangle, scaled to the footprint area
+    so the two inputs cannot disagree. Otherwise the plan is taken as the square of equal
+    area. The square under-counted a 31 x 20 m plate by 15% of its beams and 10 columns
+    (Phase II S4-010).
     """
     a = max(float(footprint_sqm), 0.0)
     bx = max(float(bay_x_m), 1.0)
     by = max(float(bay_y_m), 1.0)
     if a <= 0:
-        return {"lx": 0.0, "ly": 0.0, "nx": 0, "ny": 0, "columns": 0, "beam_length_m": 0.0}
-    side = math.sqrt(a)
-    nx = int(math.floor(side / bx)) + 1          # grid lines across
-    ny = int(math.floor(side / by)) + 1
+        return {"lx": 0.0, "ly": 0.0, "nx": 0, "ny": 0, "columns": 0, "beam_length_m": 0.0,
+                "plan_basis": "none"}
+    length, width = float(length_m or 0.0), float(width_m or 0.0)
+    if length > 0 and width > 0:
+        aspect = max(length, width) / min(length, width)
+        lx, ly = math.sqrt(a * aspect), math.sqrt(a / aspect)
+        basis = "plan dimensions"
+    else:
+        lx = ly = math.sqrt(a)
+        basis = "square of equal area"
+    nx = int(math.floor(lx / bx + 1e-9)) + 1     # grid lines across the length
+    ny = int(math.floor(ly / by + 1e-9)) + 1     # grid lines across the width
     return {
-        "lx": side, "ly": side, "nx": nx, "ny": ny,
+        "lx": lx, "ly": ly, "nx": nx, "ny": ny,
         "columns": nx * ny,
         # Beams run along every grid line in both directions.
-        "beam_length_m": ny * side + nx * side,
+        "beam_length_m": ny * lx + nx * ly,
+        "plan_basis": basis,
     }
 
 
@@ -356,7 +368,7 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
         fh = float(t.get("floor_height") or 3.0)
         if foot <= 0 or floors <= 0:
             continue
-        g = grid_counts(foot, bx, by)
+        g = grid_counts(foot, bx, by, t.get("plan_length_m") or 0, t.get("plan_width_m") or 0)
         n_col = g["columns"]
         walls = C.wall_load_kn_sqm(e["wall_material"], e["wall_thickness_mm"], fh, slab_t)
         service_per_sqm = slab_self + finishes + walls + live
@@ -426,6 +438,7 @@ def structural_takeoff(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[s
             "id": t.get("id"), "name": t.get("name"), "floors": floors,
             "footprint_sqm": round(foot, 2),
             "grid": f"{bx:g} m x {by:g} m", "columns_per_floor": n_col,
+            "plan_m": f"{g['lx']:.1f} x {g['ly']:.1f}", "plan_basis": g["plan_basis"],
             "column_section_mm": f"{int(cb_mm)} x {int(cd_mm)}",
             "beam_section_mm": f"{int(beam_w_mm)} x {int(beam_d_mm)}",
             "slab_thickness_mm": round(slab_t * 1000),

@@ -114,6 +114,10 @@ def tower_metrics(tower, cfg):
         # base shear by actual floor levels. Absent, seismic falls back to a square plan
         # and uniform storeys.
         "plan_x_m": float(tower.get("plan_x_m") or 0),
+        # Plate length and width for the quantity take-off only (the seismic period keeps
+        # using plan_x_m / plan_y_m).
+        "plan_length_m": float(tower.get("plan_length_m") or 0),
+        "plan_width_m": float(tower.get("plan_width_m") or 0),
         "plan_y_m": float(tower.get("plan_y_m") or 0),
         "ground_floor_height": float(tower.get("ground_floor_height") or 0) or None,
         "carpet_sqm": carpet,

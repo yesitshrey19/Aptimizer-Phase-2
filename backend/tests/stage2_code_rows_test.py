@@ -86,6 +86,11 @@ def _plot_project(rule, target):
                     "units": [{"id": "u", "type": "custom", "count": 1, "carpet_area": 100.0,
                                "balcony_area": 0.0}]}]
     p.pop("site_layout", None)
+    # These rows test the verdict flipping at a typed 40% limit. Coverage now follows the
+    # plot size by RMP 2015 unless a figure is set, so the 40% is set the way a user would.
+    for r in p["compliance_rules"]:
+        if r["id"] == "ground_coverage":
+            r["threshold"], r["auto"] = COVERAGE_LIMIT, False
     return p
 
 

@@ -110,9 +110,12 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
                     </Select>
                   </TableCell>
                   <TableCell className="py-1.5">
+                    {/* Coverage and open space follow the plot size (RMP 2015) until a figure is typed. */}
                     <Input type="number" step="0.1" disabled={readOnly} className="h-8 text-xs text-right font-mono rounded-sm"
-                      data-testid={`rule-threshold-${r.id}`} value={r.threshold}
-                      onChange={(e) => setRule(i, { threshold: Number(e.target.value) })} />
+                      data-testid={`rule-threshold-${r.id}`}
+                      value={r.auto !== false && res && ["ground_coverage", "open_space"].includes(r.id) ? res.threshold : r.threshold}
+                      title={r.auto !== false && ["ground_coverage", "open_space"].includes(r.id) ? "Set from the plot size by BDA RMP 2015. Type a value to override." : undefined}
+                      onChange={(e) => setRule(i, { threshold: Number(e.target.value), auto: false })} />
                   </TableCell>
                   <TableCell className="py-1.5 text-right font-mono text-xs" data-testid={`rule-actual-${r.id}`}>
                     {res ? num(res.actual, 2) : "—"}

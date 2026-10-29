@@ -158,6 +158,11 @@ CLAUSES = {
     # for plots of 2,000-4,000 m2 or roads of 24-30 m. Karnataka uses FAR for FSI.
     "rmp_far": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Table 10 (Residential Main)",
                 "topic": "FAR and ground coverage by plot size and road width"},
+    # Read 29 Oct 2026 (BDA RMP 2015 Zoning Regulations pp. 27 and 45).
+    "rmp_coverage": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Table 10 / Table 20",
+                     "topic": "Ground coverage by plot size (Table 10); by road width above 20,000 m2 (Table 20)"},
+    "rmp_open_space": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Cl. 7.1(1)",
+                       "topic": "10% of the land reserved for park and open space in residential development plans"},
     "common_corridor": {"code": "NBC 2016 Part 3", "clause": "Annex B, B-5.2.2",
                         "topic": "Internal corridor 1 500 mm minimum, 1 800 mm preferred (RMP 2015 Table 24: 1.2 m)"},
     "acc_lift": {"code": "IS 3534 / NBC Part 3", "clause": "Cl. 13.7", "topic": "Lift car 1100 × 1400 mm minimum"},
@@ -461,6 +466,30 @@ _FIRE_NBC_2016 = {
     # residential egress minimum in BDA RMP 2015 Zoning Regulations Table 24.
     "corridor_min_m": 1.5,
 }
+
+# BDA RMP 2015 Zoning Regulations, read 29 Oct 2026.
+# Table 10 (Residential Main, p. 27): maximum ground coverage by plot size, m2.
+RMP_COVERAGE_BY_PLOT = [(360, 75.0), (1000, 65.0), (2000, 60.0), (4000, 55.0), (20000, 50.0)]
+# Table 20 (residential development plan on a site over 20,000 m2, p. 45): by road width, m.
+RMP_COVERAGE_BY_ROAD_LARGE = [(12.0, 60.0), (18.0, 55.0), (24.0, 55.0), (30.0, 50.0), (float("inf"), 50.0)]
+RMP_LARGE_SITE_SQM = 20000.0
+RMP_OPEN_SPACE_PCT = 10.0          # Cl. 7.1(1), development plans (sites over 20,000 m2)
+
+
+def rmp_coverage_pct(plot_sqm: float, road_width_m: float = 0.0) -> float:
+    """Maximum ground coverage, %, from RMP 2015 Table 10, or Table 20 above 20,000 m2."""
+    if plot_sqm > RMP_LARGE_SITE_SQM:
+        # Table 20 rows read "less than 12", "above 12 up to 18" ...: a road of exactly
+        # 12 m is in the first row.
+        w = float(road_width_m or 0.0)
+        return next(c for lim, c in RMP_COVERAGE_BY_ROAD_LARGE if w <= lim)
+    return next((c for lim, c in RMP_COVERAGE_BY_PLOT if plot_sqm <= lim), RMP_COVERAGE_BY_PLOT[-1][1])
+
+
+def rmp_open_space_pct(plot_sqm: float) -> float:
+    """Minimum park and open space, %: 10% for development plans over 20,000 m2, else none."""
+    return RMP_OPEN_SPACE_PCT if plot_sqm > RMP_LARGE_SITE_SQM else 0.0
+
 
 # Every value UNREAD, on purpose. Secondary sources report the high-rise trigger moving
 # from 15 m to 24 m and Part 4 folding into the restructured six-part document, but the

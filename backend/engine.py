@@ -628,8 +628,8 @@ def utilities(project, areas, city=None):
 DEFAULT_RULES = [
     {"id": "far_max", "code": "FAR-01", "label": "Maximum permissible FAR", "param": "far", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True},
     {"id": "fsi_max", "code": "FSI-01", "label": "Maximum permissible FSI", "param": "fsi", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True},
-    {"id": "ground_coverage", "code": "GC-01", "label": "Maximum ground coverage", "param": "ground_coverage_pct", "operator": "max", "threshold": 40.0, "unit": "%", "enabled": True},
-    {"id": "open_space", "code": "OS-01", "label": "Minimum open space", "param": "open_space_pct", "operator": "min", "threshold": 30.0, "unit": "%", "enabled": True},
+    {"id": "ground_coverage", "code": "GC-01", "label": "Maximum ground coverage", "param": "ground_coverage_pct", "operator": "max", "threshold": 40.0, "unit": "%", "enabled": True, "auto": "rmp"},
+    {"id": "open_space", "code": "OS-01", "label": "Minimum open space", "param": "open_space_pct", "operator": "min", "threshold": 30.0, "unit": "%", "enabled": True, "auto": "rmp"},
     {"id": "stair_width", "code": "NBC-STR", "label": "Minimum staircase width", "param": "min_stair_width", "operator": "min", "threshold": iscodes.FIRE["stair_min_width_m"], "unit": "m", "enabled": True},
     {"id": "corridor_width", "code": "NBC-COR", "label": "Minimum corridor width (means of egress)", "param": "min_corridor_width", "operator": "min", "threshold": iscodes.FIRE["corridor_min_m"], "unit": "m", "enabled": True},
     {"id": "lift_ratio", "code": "LFT-01", "label": "Minimum lifts per tower (>= floors/8)", "param": "lift_shortfall", "operator": "max", "threshold": 0, "unit": "nos", "enabled": True},
@@ -650,7 +650,31 @@ RULE_BASIS = {
     "ramp_slope": "parking_ramp", "accessible_parking": "parking_accessible",
     "parking_provision": "parking_ecs", "corridor_width": "common_corridor",
     "far_max": "rmp_far", "fsi_max": "rmp_far",
+    "ground_coverage": "rmp_coverage", "open_space": "rmp_open_space",
 }
+
+# Thresholds these two rules carried before they followed RMP 2015. A project saved with
+# the old defaults still holds them, and an exact match is taken to mean "never edited".
+_LEGACY_DEFAULTS = {"ground_coverage": 40.0, "open_space": 30.0}
+
+
+def effective_threshold(rule, areas, project):
+    """The threshold a rule is checked against, with the RMP 2015 plot-size limits filled
+    in for coverage and open space unless the user has set their own figure."""
+    t = float(rule.get("threshold") or 0)
+    rid = rule.get("id")
+    auto = rule.get("auto") == "rmp" or (rid in _LEGACY_DEFAULTS and t == _LEGACY_DEFAULTS[rid]
+                                          and "auto" not in rule)
+    if not auto:
+        return t
+    plot = float(areas.get("plot_area_sqm") or 0)
+    if rid == "ground_coverage":
+        roads = (project.get("plot") or {}).get("road_edges") or []
+        width = max((float(e.get("width") or 0) for e in roads), default=0.0)
+        return iscodes.rmp_coverage_pct(plot, width)
+    if rid == "open_space":
+        return iscodes.rmp_open_space_pct(plot)
+    return t
 
 
 def rule_reference(rule_id):
@@ -695,7 +719,7 @@ def compliance(project, areas, park):
         # 3.0" -- about one at-limit design in seven. Six places removes the float noise and
         # still catches any real excess (Phase II Stage 2 finding).
         actual = round(float(params.get(r["param"], 0)), 6)
-        threshold = float(r.get("threshold") or 0)
+        threshold = effective_threshold(r, areas, project)
         ok = actual <= threshold if r.get("operator") == "max" else actual >= threshold
         results.append({
             "id": r.get("id"), "code": r.get("code"), "label": r.get("label"),
@@ -740,7 +764,8 @@ def capacity_forecast(project, areas, park):
     rules = {r.get("id"): r for r in (project.get("compliance_rules") or DEFAULT_RULES)
              if r.get("enabled", True)}
     far_cap = float((rules.get("far_max") or {}).get("threshold") or 3.0)
-    coverage_cap = float((rules.get("ground_coverage") or {}).get("threshold") or 40.0)
+    coverage_cap = (effective_threshold(rules["ground_coverage"], areas, project)
+                    if rules.get("ground_coverage") else 40.0)
 
     current_floors = max((int(t.get("floors") or 0) for t in towers), default=0)
     if current_floors < 1:

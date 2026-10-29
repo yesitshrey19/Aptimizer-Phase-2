@@ -51,3 +51,9 @@ def test_dxf_of_typed_towers_has_real_footprints_and_title_numbers():
     assert all("738.64 m2" in t for t in texts if t[:3] in ("A  ", "B  ", "C  "))
     title = next(t for t in texts if "|" in t)
     assert "?" not in title and f"units {a['total_units']}" in title
+
+
+def test_corridor_rule_cites_nbc_part3_annex_b():
+    # Read 29 Oct 2026: NBC 2016 Part 3 Annex B, B-5.2.2 (p. 78), 1 500 mm minimum.
+    ref = engine.rule_reference("corridor_width")
+    assert ref["verified"] and "B-5.2.2" in ref["reference"] and ref["edition"] == "2016"

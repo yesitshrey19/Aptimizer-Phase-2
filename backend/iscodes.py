@@ -150,6 +150,11 @@ CLAUSES = {
     "acc_ramp": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.3", "topic": "Accessible ramp slope max 1:12"},
     "acc_door": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.5", "topic": "Minimum clear door width 900 mm"},
     "acc_corridor": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.6", "topic": "Corridor width 1200 mm min, 1500 mm preferred"},
+    # Read 29 Oct 2026 (NBC 2016 Vol 1, Part 3 p. 78): internal corridors 1 500 mm minimum
+    # unobstructed, 1 800 mm preferred. BDA RMP 2015 Zoning Regulations Table 24 sets a
+    # lower egress floor of 1.2 m for residential stairways/corridors; 1.5 m governs.
+    "common_corridor": {"code": "NBC 2016 Part 3", "clause": "Annex B, B-5.2.2",
+                        "topic": "Internal corridor 1 500 mm minimum, 1 800 mm preferred (RMP 2015 Table 24: 1.2 m)"},
     "acc_lift": {"code": "IS 3534 / NBC Part 3", "clause": "Cl. 13.7", "topic": "Lift car 1100 × 1400 mm minimum"},
     "acc_handrail": {"code": "NBC 2016 Part 3", "clause": "Cl. 13.3.4", "topic": "Dual handrails at 760 mm and 900 mm"},
     "acc_tactile": {"code": "NBC 2016 Part 3 / UNCRPD", "clause": "Cl. 13.9", "topic": "Tactile guiding path entrance to lift"},
@@ -446,9 +451,9 @@ _FIRE_NBC_2016 = {
     "refuge_balcony_from_m": 60.0, "refuge_balcony_every_m": 30.0,
     "extinguisher_per_sqm": 200.0,
     "fire_lift_above_m": 15.0, "fire_lift_car": (1.1, 2.1), "pressurisation_above_m": 15.0,
-    # Means-of-egress corridor width (NBC Part 4). Distinct from the accessibility
-    # corridor in ACCESS below, which is a barrier-free requirement under Part 3 — the
-    # governing width for a project is the larger of the two.
+    # Common corridor width. Part 4 sets no fixed figure (Cl. 4.4.2.4.2(a)); the 1.5 m
+    # comes from NBC 2016 Part 3 Annex B, B-5.2.2 (p. 78), which is above the 1.2 m
+    # residential egress minimum in BDA RMP 2015 Zoning Regulations Table 24.
     "corridor_min_m": 1.5,
 }
 

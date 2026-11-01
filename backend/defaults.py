@@ -226,7 +226,7 @@ def default_project(name, client, location, plot_reference, owner_id, latitude=N
         "accessible_pct": 2.0,
         "visitor_provided": 8,
         "ev_provided": 16,
-        "accessible_provided": 2,
+        "accessible_provided": None,  # blank = the required number (see parking.plan)
         "ramp": {"slope_pct": 10.0, "width": 3.6, "turning_radius": 6.0},
     }
     return {

@@ -843,6 +843,14 @@ def _accessible_bays_required(b):
     return math.ceil(ecs / C.PARKING["accessible_per"]) if ecs else 0
 
 
+def _accessible_provided(base, required):
+    """Bays the scheme provides; a blank entry means the required number (parking.plan)."""
+    park = base.get("parking") or {}
+    if not park.get("accessible_entered", True):
+        return required
+    return int(park.get("accessible_provided") or 0)
+
+
 def m7_parking_nbc(project, base, e):
     b = _building(project, base)
     p = project.get("parking") or {}
@@ -867,8 +875,8 @@ def m7_parking_nbc(project, base, e):
               f"{e['basement_headroom_m']} m", "≥ 2.4 m", "parking_headroom"),
         check("Aisle width ≥ 6.0 m for 90° bays", float(e["aisle_width_m"]) >= C.PARKING["aisle_90deg"],
               f"{e['aisle_width_m']} m", "≥ 6.0 m", "parking_aisle"),
-        check("Accessible bays (1 per 50)", int(p.get("accessible_provided") or 0) >= accessible_req,
-              p.get("accessible_provided") or 0, accessible_req, "parking_accessible"),
+        check("Accessible bays (1 per 50)", _accessible_provided(base, accessible_req) >= accessible_req,
+              _accessible_provided(base, accessible_req), accessible_req, "parking_accessible"),
         check("EV-ready spaces (20%)", int(p.get("ev_provided") or 0) >= ev_req, p.get("ev_provided") or 0,
               ev_req, "parking_ev"),
         check("Two-wheeler spaces (0.5 per unit)", int(e["two_wheeler_provided"]) >= tw_required,
@@ -1083,9 +1091,9 @@ def m9_accessibility(project, base, e):
         check("Tactile guiding path entrance → lift", bool(e["tactile_path"]),
               "provided" if e["tactile_path"] else "not provided", "required", "acc_tactile"),
         check("Accessible parking bays",
-              int((project.get("parking") or {}).get("accessible_provided") or 0)
+              _accessible_provided(base, _accessible_bays_required(b))
               >= _accessible_bays_required(b),
-              (project.get("parking") or {}).get("accessible_provided") or 0,
+              _accessible_provided(base, _accessible_bays_required(b)),
               _accessible_bays_required(b), "parking_accessible",
               "same 1-per-50-ECS basis as the Parking module"),
     ]

@@ -1,7 +1,9 @@
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 
-export const NumField = ({ label, value, onChange, suffix, step = 1, testid, disabled, hint }) => (
+// blankAs: what an emptied field sends. 0 by default; null for inputs where blank means
+// "not entered" (e.g. accessible bays, which then default to the required number).
+export const NumField = ({ label, value, onChange, suffix, step = 1, testid, disabled, hint, blankAs = 0 }) => (
   <div className="space-y-1">
     <Label htmlFor={testid} className="text-[11px] uppercase tracking-wide text-slate-500">{label}</Label>
     <div className="relative">
@@ -13,7 +15,7 @@ export const NumField = ({ label, value, onChange, suffix, step = 1, testid, dis
         disabled={disabled}
         data-testid={testid}
         value={value ?? ""}
-        onChange={(e) => { if (e.target.value === "" || Number.isFinite(e.target.valueAsNumber)) onChange(e.target.value === "" ? 0 : e.target.valueAsNumber); }}
+        onChange={(e) => { if (e.target.value === "" || Number.isFinite(e.target.valueAsNumber)) onChange(e.target.value === "" ? blankAs : e.target.valueAsNumber); }}
         className="h-9 rounded-sm font-mono text-sm pr-12"
       />
       {suffix && (

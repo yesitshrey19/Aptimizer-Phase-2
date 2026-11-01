@@ -172,7 +172,7 @@ export default function ParkingModule({ project, analysis, update, readOnly, pro
             <NumField label="Accessible %" suffix="%" value={p.accessible_pct} disabled={readOnly} onChange={(v) => set("accessible_pct", v)} testid="parking-accessible-pct-input" />
             <NumField label="Visitor provided" value={p.visitor_provided} disabled={readOnly} onChange={(v) => set("visitor_provided", v)} testid="parking-visitor-provided-input" />
             <NumField label="EV provided" value={p.ev_provided} disabled={readOnly} onChange={(v) => set("ev_provided", v)} testid="parking-ev-provided-input" />
-            <NumField label="Accessible provided" value={p.accessible_provided} disabled={readOnly} onChange={(v) => set("accessible_provided", v)} testid="parking-accessible-provided-input" />
+            <NumField label="Accessible provided" value={p.accessible_provided} blankAs={null} hint="Blank = the required number" disabled={readOnly} onChange={(v) => set("accessible_provided", v)} testid="parking-accessible-provided-input" />
           </div>
           <div className="grid grid-cols-3 gap-3 mt-3">
             <Metric label="Visitor required" value={int(r?.visitor_required)} testid="parking-visitor-required" />

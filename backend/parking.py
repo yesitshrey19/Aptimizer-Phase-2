@@ -284,7 +284,12 @@ def plan(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
                            if accessible_pct is not None else math.ceil(required / ACCESSIBLE_PER))
     visitor_provided = int(p.get("visitor_provided") or 0)
     ev_provided = int(p.get("ev_provided") or 0)
-    accessible_provided = int(p.get("accessible_provided") or 0)
+    # Blank means "not entered yet": plan for the required number rather than failing the
+    # check on a placeholder. New projects used to be seeded with 2 bays, which is under the
+    # 2% rule for any site needing more than 100 cars (Phase II Stage 5 finding).
+    accessible_raw = p.get("accessible_provided")
+    accessible_entered = accessible_raw not in (None, "")
+    accessible_provided = int(accessible_raw) if accessible_entered else accessible_required
 
     total_area = basement_levels * basement_area + ground_area
     # The old "layout efficiency" divided the parking area by a slot count that was itself
@@ -351,6 +356,7 @@ def plan(project: Dict[str, Any], areas: Dict[str, Any]) -> Dict[str, Any]:
         "visitor_provided": visitor_provided,
         "ev_provided": ev_provided,
         "accessible_provided": accessible_provided,
+        "accessible_entered": accessible_entered,
         "total_parking_area_sqm": round(total_area, 2),
         "area_per_slot_actual": round(total_area / provided, 2) if provided else 0,
         "efficiency_pct": efficiency,

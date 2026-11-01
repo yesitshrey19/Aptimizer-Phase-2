@@ -156,8 +156,9 @@ CLAUSES = {
     # Read 29 Oct 2026 (BDA RMP 2015 Zoning Regulations, p. 27). FAR rises with plot size
     # and road width: 1.75 / 2.25 / 2.50 / 3.00 / 3.25; the app's default 3.0 is the row
     # for plots of 2,000-4,000 m2 or roads of 24-30 m. Karnataka uses FAR for FSI.
-    "rmp_far": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Table 10 (Residential Main)",
-                "topic": "FAR and ground coverage by plot size and road width"},
+    "rmp_far": {"code": "BDA RMP 2015 Zoning Regulations",
+                "clause": "Table 10 (Residential Main); Table 20 above 20,000 m2",
+                "topic": "FAR by abutting road width"},
     # Read 29 Oct 2026 (BDA RMP 2015 Zoning Regulations pp. 27 and 45).
     "rmp_coverage": {"code": "BDA RMP 2015 Zoning Regulations", "clause": "Table 10 / Table 20",
                      "topic": "Ground coverage by plot size (Table 10); by road width above 20,000 m2 (Table 20)"},
@@ -484,6 +485,23 @@ def rmp_coverage_pct(plot_sqm: float, road_width_m: float = 0.0) -> float:
         w = float(road_width_m or 0.0)
         return next(c for lim, c in RMP_COVERAGE_BY_ROAD_LARGE if w <= lim)
     return next((c for lim, c in RMP_COVERAGE_BY_PLOT if plot_sqm <= lim), RMP_COVERAGE_BY_PLOT[-1][1])
+
+
+# FAR by abutting road width, m: Table 10 (Residential Main, p. 27) and Table 20 (residential
+# development plan on a site over 20,000 m2, p. 45). Read 1 Nov 2026.
+RMP_FAR_BY_ROAD = [(12.0, 1.75), (18.0, 2.25), (24.0, 2.50), (30.0, 3.00), (float("inf"), 3.25)]
+RMP_FAR_BY_ROAD_LARGE = [(12.0, 2.00), (18.0, 2.25), (24.0, 2.50), (30.0, 3.00), (float("inf"), 3.25)]
+
+
+def rmp_far(plot_sqm: float, road_width_m: float = 0.0):
+    """Maximum FAR from RMP 2015 Table 10, or Table 20 above 20,000 m2. Both tables key FAR
+    to the road width alone, so with no road width entered there is nothing to look up and
+    this returns None (the rule then keeps its typed threshold)."""
+    w = float(road_width_m or 0.0)
+    if w <= 0:
+        return None
+    table = RMP_FAR_BY_ROAD_LARGE if plot_sqm > RMP_LARGE_SITE_SQM else RMP_FAR_BY_ROAD
+    return next(f for lim, f in table if w <= lim)
 
 
 def rmp_open_space_pct(plot_sqm: float) -> float:

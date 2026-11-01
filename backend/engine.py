@@ -626,8 +626,8 @@ def utilities(project, areas, city=None):
 
 
 DEFAULT_RULES = [
-    {"id": "far_max", "code": "FAR-01", "label": "Maximum permissible FAR", "param": "far", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True},
-    {"id": "fsi_max", "code": "FSI-01", "label": "Maximum permissible FSI", "param": "fsi", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True},
+    {"id": "far_max", "code": "FAR-01", "label": "Maximum permissible FAR", "param": "far", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True, "auto": "rmp"},
+    {"id": "fsi_max", "code": "FSI-01", "label": "Maximum permissible FSI", "param": "fsi", "operator": "max", "threshold": 3.0, "unit": "ratio", "enabled": True, "auto": "rmp"},
     {"id": "ground_coverage", "code": "GC-01", "label": "Maximum ground coverage", "param": "ground_coverage_pct", "operator": "max", "threshold": 40.0, "unit": "%", "enabled": True, "auto": "rmp"},
     {"id": "open_space", "code": "OS-01", "label": "Minimum open space", "param": "open_space_pct", "operator": "min", "threshold": 30.0, "unit": "%", "enabled": True, "auto": "rmp"},
     {"id": "stair_width", "code": "NBC-STR", "label": "Minimum staircase width", "param": "min_stair_width", "operator": "min", "threshold": iscodes.FIRE["stair_min_width_m"], "unit": "m", "enabled": True},
@@ -655,23 +655,28 @@ RULE_BASIS = {
 
 # Thresholds these two rules carried before they followed RMP 2015. A project saved with
 # the old defaults still holds them, and an exact match is taken to mean "never edited".
-_LEGACY_DEFAULTS = {"ground_coverage": 40.0, "open_space": 30.0}
+_LEGACY_DEFAULTS = {"ground_coverage": 40.0, "open_space": 30.0, "far_max": 3.0, "fsi_max": 3.0}
 
 
 def effective_threshold(rule, areas, project):
     """The threshold a rule is checked against, with the RMP 2015 plot-size limits filled
-    in for coverage and open space unless the user has set their own figure."""
+    in for coverage, open space and FAR unless the user has set their own figure."""
     t = float(rule.get("threshold") or 0)
     rid = rule.get("id")
-    auto = rule.get("auto") == "rmp" or (rid in _LEGACY_DEFAULTS and t == _LEGACY_DEFAULTS[rid]
-                                          and "auto" not in rule)
+    # Auto only while the threshold is still the stock default: a figure set through the
+    # API (or typed in the UI, which also sets auto False) is the user's and is kept.
+    auto = (rid in _LEGACY_DEFAULTS and t == _LEGACY_DEFAULTS[rid]
+            and rule.get("auto", "rmp") == "rmp")
     if not auto:
         return t
     plot = float(areas.get("plot_area_sqm") or 0)
+    roads = (project.get("plot") or {}).get("road_edges") or []
+    width = max((float(e.get("width") or 0) for e in roads), default=0.0)
     if rid == "ground_coverage":
-        roads = (project.get("plot") or {}).get("road_edges") or []
-        width = max((float(e.get("width") or 0) for e in roads), default=0.0)
         return iscodes.rmp_coverage_pct(plot, width)
+    if rid in ("far_max", "fsi_max"):
+        far = iscodes.rmp_far(plot, width)
+        return t if far is None else far
     if rid == "open_space":
         return iscodes.rmp_open_space_pct(plot)
     return t
@@ -763,7 +768,8 @@ def capacity_forecast(project, areas, park):
 
     rules = {r.get("id"): r for r in (project.get("compliance_rules") or DEFAULT_RULES)
              if r.get("enabled", True)}
-    far_cap = float((rules.get("far_max") or {}).get("threshold") or 3.0)
+    far_cap = (effective_threshold(rules["far_max"], areas, project)
+               if rules.get("far_max") else 3.0) or 3.0
     coverage_cap = (effective_threshold(rules["ground_coverage"], areas, project)
                     if rules.get("ground_coverage") else 40.0)
 
@@ -894,7 +900,8 @@ def far_derivation(project, areas):
 
     far = builtup / plot_area if plot_area else 0.0
     fsi = far * fsi_factor
-    cap = float(limits.get("far_max", {}).get("threshold") or 0)
+    cap = (float(effective_threshold(limits["far_max"], areas, project) or 0)
+           if "far_max" in limits else 0.0)
 
     return {
         "formula": "FAR = total built-up area / plot area",

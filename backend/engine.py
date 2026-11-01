@@ -675,8 +675,11 @@ def effective_threshold(rule, areas, project):
     if rid == "ground_coverage":
         return iscodes.rmp_coverage_pct(plot, width)
     if rid in ("far_max", "fsi_max"):
+        # Premium FAR / TDR bought on top of the base limit (Karnataka allows both); the
+        # sanction's permissible FAR is the base plus this. A typed limit is the total.
+        premium = float(project.get("premium_far") or 0)
         far = iscodes.rmp_far(plot, width)
-        return t if far is None else far
+        return round((t if far is None else far) + premium, 6)
     if rid == "open_space":
         return iscodes.rmp_open_space_pct(plot)
     return t

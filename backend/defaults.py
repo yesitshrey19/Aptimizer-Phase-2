@@ -275,5 +275,6 @@ def default_project(name, client, location, plot_reference, owner_id, latitude=N
             "kw_per_unit": 4.0,
         },
         "compliance_rules": [dict(r) for r in DEFAULT_RULES],
+        "premium_far": 0.0,  # premium FAR / TDR added to the RMP FAR limit
         "engineering": {"city": _city["city"], "state": _city["state"]} if _city["source"] != "default" else {},
     }

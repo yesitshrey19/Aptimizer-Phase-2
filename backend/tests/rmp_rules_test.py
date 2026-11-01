@@ -96,3 +96,21 @@ def test_a_typed_far_is_kept():
         if r["id"] == "far_max":
             r["threshold"], r["auto"] = 1.5, False
     assert _rule(engine.analyse(p)["compliance"], "far_max")["threshold"] == 1.5
+
+
+def test_premium_far_is_added_to_the_rmp_limit():
+    # RERA P3: 3,085 m2 plot, sanction permissible FAR 3.68 = RMP base + premium FAR / TDR.
+    p = _with_road(40.0)
+    p["premium_far"] = 0.43
+    a = engine.analyse(p)
+    assert _rule(a["compliance"], "far_max")["threshold"] == 3.68
+    assert _rule(a["compliance"], "fsi_max")["threshold"] == 3.68
+
+
+def test_premium_far_does_not_change_a_typed_limit():
+    p = _with_road(40.0)
+    p["premium_far"] = 0.43
+    for r in p["compliance_rules"]:
+        if r["id"] == "far_max":
+            r["threshold"], r["auto"] = 1.5, False
+    assert _rule(engine.analyse(p)["compliance"], "far_max")["threshold"] == 1.5

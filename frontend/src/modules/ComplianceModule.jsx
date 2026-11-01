@@ -1,5 +1,5 @@
 import { Check, X, Plus, Trash2 } from "lucide-react";
-import { Metric, Section } from "../components/Field";
+import { Metric, NumField, Section } from "../components/Field";
 import { AiPanel } from "../components/AiPanel";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -65,6 +65,12 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
           )
         }
       >
+        <div className="mb-3 max-w-xs">
+          <NumField label="Premium FAR / TDR" step={0.01} testid="premium-far" disabled={readOnly}
+            value={project.premium_far ?? 0}
+            onChange={(v) => update((p) => { p.premium_far = v; })}
+            hint="Extra FAR bought on top of the RMP limit (from the sanction's FAR box). Added to the FAR and FSI limits." />
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -114,7 +120,7 @@ export default function ComplianceModule({ project, analysis, update, readOnly, 
                     <Input type="number" step="0.1" disabled={readOnly} className="h-8 text-xs text-right font-mono rounded-sm"
                       data-testid={`rule-threshold-${r.id}`}
                       value={r.auto !== false && res && ["ground_coverage", "open_space", "far_max", "fsi_max"].includes(r.id) ? res.threshold : r.threshold}
-                      title={r.auto !== false && ["ground_coverage", "open_space", "far_max", "fsi_max"].includes(r.id) ? (["far_max", "fsi_max"].includes(r.id) ? "Set from the road width by BDA RMP 2015 Table 10/20 (needs a road width on the plot). Type a value to override." : "Set from the plot size by BDA RMP 2015. Type a value to override.") : undefined}
+                      title={r.auto !== false && ["ground_coverage", "open_space", "far_max", "fsi_max"].includes(r.id) ? (["far_max", "fsi_max"].includes(r.id) ? "Set from the road width by BDA RMP 2015 Table 10/20 (needs a road width on the plot), plus any premium FAR / TDR. Type a value to override with the total." : "Set from the plot size by BDA RMP 2015. Type a value to override.") : undefined}
                       onChange={(e) => setRule(i, { threshold: Number(e.target.value), auto: false })} />
                   </TableCell>
                   <TableCell className="py-1.5 text-right font-mono text-xs" data-testid={`rule-actual-${r.id}`}>

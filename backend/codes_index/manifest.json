@@ -1,21 +1,61 @@
 {
  "embed_model": "gemini-embedding-001",
  "dimension": 3072,
- "chunk_count": 15,
- "built_at": "2026-10-26T21:25:19Z",
+ "chunk_count": 64,
+ "built_at": "2026-11-02T19:57:24Z",
  "files": {
+  "is10262.md": "db50b00a32ca77605517e21a6d933d78a2e49123c8aa69894e591b6ddf173dd1",
+  "is1172.md": "76e61fad211f135bb6e6dc2125cd82e98a97d6f4591960d651c8a9f3abb40f03",
+  "is13920_1993.md": "4ce2337769cfd6a0bf9bfee20640688fd7e8e7ca2083b72398f0196a4b86f5dd",
+  "is1904.md": "4280c6c541f6ec325aec4b7d830d11fc4f164b39b30ca3c2fa6a939a90c7c076",
+  "is456.md": "00497f299a3c717b4868c12de40febc6ce0ff3ad20d71fe8a16389b98ebe747e",
+  "is875_1.md": "68ba1265809c1f6c533aec9c8d3bda37fe9e0dfe8f5e4ece290e4e5ec16621db",
+  "is875_2.md": "3a83192904c316ed3d80ba52d62175f272aabd6afdf813c265153ed21674eee1",
+  "is875_3.md": "b53a2ba2306a0f51c33f470979061be681dfe9380a122ab1d5789095ce2a4525",
   "nbc3.md": "5905a4e70d6873f20dfea9e98167c63bb7583441b8796ab7a033b4ae5e69c299",
   "nbc4.md": "032b9ad4126be153505ae0fe1a5ab24f6b054f2990c24fd82bbc48f52be0cb5a"
  },
  "vectors": true,
  "chunk_spans": {
-  "nbc3.md": [
+  "is10262.md": [
    0,
-   6
+   7
+  ],
+  "is1172.md": [
+   7,
+   10
+  ],
+  "is13920_1993.md": [
+   10,
+   12
+  ],
+  "is1904.md": [
+   12,
+   14
+  ],
+  "is456.md": [
+   14,
+   37
+  ],
+  "is875_1.md": [
+   37,
+   39
+  ],
+  "is875_2.md": [
+   39,
+   42
+  ],
+  "is875_3.md": [
+   42,
+   49
+  ],
+  "nbc3.md": [
+   49,
+   55
   ],
   "nbc4.md": [
-   6,
-   15
+   55,
+   64
   ]
  }
 }

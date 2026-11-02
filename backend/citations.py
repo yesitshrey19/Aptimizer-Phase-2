@@ -32,8 +32,10 @@ import iscodes as C
 # "IS 456:2000", "IS 875 (Part 3):2015", "NBC Part 4", "Cl. 7.6.2", "Clause 23.2.1",
 # "Table 2". Deliberately loose on the standard number and strict on shape -- a false
 # positive costs one lookup, a miss ships an unchecked citation.
+# The prefix is matched case-sensitively: "the cover for moderate exposure is 30 mm" put
+# a code called "is 30" on the unverified list of a correct answer (Phase II, 3 Nov 2026).
 _STANDARD = re.compile(
-    r"\b(?:IS|SP)\s*[:\s]?\s*(\d{2,5})\s*(?:\(\s*Part\s*(\d+)\s*\))?\s*(?::\s*(\d{4}))?",
+    r"\b(?-i:IS|SP)\s*[:\s]?\s*(\d{2,5})\s*(?:\(\s*Part\s*(\d+)\s*\))?\s*(?::\s*(\d{4}))?",
     re.IGNORECASE)
 _NBC = re.compile(r"\bNBC\b[^.,;)\n]{0,40}?Part\s*(\d+)", re.IGNORECASE)
 # The designation is usually numeric ("Cl. 7.6.2", "Table 2"), but annexes are

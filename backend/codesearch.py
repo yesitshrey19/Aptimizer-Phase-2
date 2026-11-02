@@ -506,17 +506,26 @@ def _resolve_code(stem: str, text: str) -> Tuple[Optional[str], str]:
     """
     lookup = _id_lookup()
     s = stem.strip().lower()
-    cid = s if s in C.CODE_INDEX else lookup.get(_squash(s))
-    if cid:
-        return cid, C.CODE_INDEX[cid]["code"]
     named = _first_designation(text)
-    if named:
+    cid = s if s in C.CODE_INDEX else lookup.get(_squash(s))
+    if not cid and named:
         norm = citations._norm_code(named)
         cid = lookup.get(_squash(norm)) or lookup.get(_squash(citations._base(norm)))
-        if cid:
-            return cid, C.CODE_INDEX[cid]["code"]
+    if cid:
+        # A file read from another edition (IS 13920:1993 where the library holds 2016)
+        # keeps its own edition: its clause numbers and values belong to that book, and
+        # labelling them with the library's year would cite a clause the reader can't find.
+        if _edition(named) and _edition(C.CODE_INDEX[cid]["code"]) not in (None, _edition(named)):
+            return None, named
+        return cid, C.CODE_INDEX[cid]["code"]
+    if named:
         return None, named
     return None, stem.upper()
+
+
+def _edition(designation: str) -> Optional[str]:
+    m = citations._STANDARD.search(designation or "")
+    return m.group(3) if m else None
 
 
 # A corpus directory collects notes as well as code text -- an operator's own README

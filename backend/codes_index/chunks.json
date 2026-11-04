@@ -132,6 +132,149 @@
   "merged": []
  },
  {
+  "chunk_id": "is18932002#preamble",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "",
+  "heading": "IS 1893 (Part 1):2002 — Criteria for Earthquake Resistant Design of Structures, General Provisions a",
+  "text": "IS 1893 (Part 1):2002 — Criteria for Earthquake Resistant Design of Structures, General Provisions and Buildings (checked facts)\nNOTE — Values summarised in Aptimizer's own words from IS 1893 (Part 1):2002, the edition held by the Phase II team, checked by Saurav Ambasta. The 2016 revision renumbered these clauses and tables; these are the 2002 numbers. Page numbers are printed page numbers. This is not the text of the Code.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#table-2",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Table 2",
+  "heading": "Zone factor Z",
+  "text": "Table 2 Zone factor Z\nUnder IS 1893 (Part 1):2002 Table 2, the zone factor Z is 0.10 for seismic zone II, 0.16 for zone III, 0.24 for zone IV and 0.36 for zone V. Z is used in the design horizontal seismic coefficient of Cl. 6.4.2. Checked on printed page 16.",
+  "kind": "table",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#annex-e",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Annex E",
+  "heading": "Zone factors for some important towns",
+  "text": "Annex E Zone factors for some important towns\nUnder IS 1893 (Part 1):2002 Annex E, Bengaluru (Bangalore) is in seismic zone II, Chennai is in zone III and Delhi is in zone IV; the zone factor for each zone is given in Table 2. Checked on printed page 35.",
+  "kind": "annex",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#6.4.2",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 6.4.2",
+  "heading": "Design horizontal seismic coefficient",
+  "text": "6.4.2 Design horizontal seismic coefficient\nUnder IS 1893 (Part 1):2002 Cl. 6.4.2, the design horizontal seismic coefficient is Ah = (Z/2) × (I/R) × (Sa/g), where Z is the zone factor, I the importance factor, R the response reduction factor and Sa/g the average response acceleration coefficient. Checked on printed page 14.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.6.1",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.6.1",
+  "heading": "Fundamental natural period without brick infill",
+  "text": "7.6.1 Fundamental natural period without brick infill\nUnder IS 1893 (Part 1):2002 Cl. 7.6.1, the approximate fundamental natural period of a reinforced concrete moment-resisting frame building without brick infill panels is Ta = 0.075 h^0.75 seconds, where h is the height of the building in metres. Checked on printed page 24.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.6.2",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.6.2",
+  "heading": "Fundamental natural period of other buildings",
+  "text": "7.6.2 Fundamental natural period of other buildings\nUnder IS 1893 (Part 1):2002 Cl. 7.6.2, the approximate fundamental natural period of all other buildings, including moment-resisting frame buildings with brick infill panels, is Ta = 0.09 h / √d seconds, where h is the height and d the base dimension along the direction of the lateral force, both in metres. Checked on printed page 24.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#table-6",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Table 6",
+  "heading": "Importance factor I",
+  "text": "Table 6 Importance factor I\nUnder IS 1893 (Part 1):2002 Table 6, the importance factor is 1.0 for all other buildings, which includes ordinary residential buildings, and 1.5 for important service and community buildings such as hospitals, schools, monumental structures and emergency buildings. Checked on printed page 18.",
+  "kind": "table",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#table-7",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Table 7",
+  "heading": "Response reduction factor R",
+  "text": "Table 7 Response reduction factor R\nUnder IS 1893 (Part 1):2002 Table 7, the response reduction factor R is 3.0 for an ordinary reinforced concrete moment-resisting frame (OMRF) and 5.0 for a special reinforced concrete moment-resisting frame (SMRF). Checked on printed page 23.",
+  "kind": "table",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#table-8",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Table 8",
+  "heading": "Percentage of imposed load in seismic weight",
+  "text": "Table 8 Percentage of imposed load in seismic weight\nUnder IS 1893 (Part 1):2002 Table 8, the seismic weight includes 25 percent of the imposed floor load where the uniformly distributed imposed load is up to and including 3.0 kN/m², and 50 percent where it is above 3.0 kN/m². Checked on printed page 24.",
+  "kind": "table",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.3.2",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.3.2",
+  "heading": "Imposed load on the roof",
+  "text": "7.3.2 Imposed load on the roof\nUnder IS 1893 (Part 1):2002 Cl. 7.3.2, the imposed load on the roof need not be considered when calculating the design seismic forces of the structure, so it is left out of the seismic weight. Checked on printed page 17.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.5.3",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.5.3",
+  "heading": "Design seismic base shear",
+  "text": "7.5.3 Design seismic base shear\nUnder IS 1893 (Part 1):2002 Cl. 7.5.3, the design seismic base shear along any principal direction is VB = Ah × W, where Ah is the design horizontal acceleration spectrum value (Cl. 6.4.2) and W the seismic weight of the building. Checked on printed page 24.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.8.2.1",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.8.2.1",
+  "heading": "Damping",
+  "text": "7.8.2.1 Damping\nUnder IS 1893 (Part 1):2002 Cl. 7.8.2.1, the damping for dynamic analysis of buildings may be taken as 5 percent of critical for reinforced concrete buildings and 2 percent for steel buildings. Checked on printed page 25.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "is18932002#7.11.1",
+  "code_id": null,
+  "code": "IS 1893 (Part 1):2002",
+  "code_norm": "is1893p1",
+  "clause": "Cl. 7.11.1",
+  "heading": "Storey drift limitation",
+  "text": "7.11.1 Storey drift limitation\nUnder IS 1893 (Part 1):2002 Cl. 7.11.1, the storey drift in any storey due to the minimum specified design lateral force, with a partial load factor of 1.0, shall not exceed 0.004 times the storey height. Checked on printed page 27.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
   "chunk_id": "is1904#preamble",
   "code_id": "is1904",
   "code": "IS 1904:1986",
@@ -701,6 +844,28 @@
   "heading": "4 Refuge area",
   "text": "Annex E-4 Refuge area\nRefuge area shall be provided in buildings more than 24 m high, at or immediately above 24 m and thereafter at every 15 m or so, sized at 0.3 m² per person for the occupants of two consecutive floors plus wheelchair space. High rise apartment buildings whose apartments have balconies need not provide refuge areas, but above 60 m such buildings shall provide refuge areas at 60 m and thereafter every 30 m. Checked on page 88.",
   "kind": "annex",
+  "merged": []
+ },
+ {
+  "chunk_id": "punmiafoundations#preamble",
+  "code_id": null,
+  "code": "Punmia, Soil Mechanics and Foundations, 17th edition",
+  "code_norm": "punmia,soilmechanicsandfoundations,17thedition",
+  "clause": "",
+  "heading": "Punmia, Soil Mechanics and Foundations, 17th edition — textbook formulas (checked facts)",
+  "text": "Punmia, Soil Mechanics and Foundations, 17th edition — textbook formulas (checked facts)\nNOTE — A textbook formula, not a code clause, summarised in Aptimizer's own words from B. C. Punmia, Soil Mechanics and Foundations (17th edition), checked by Saurav Ambasta in Phase II testing. The Indian Standards the team holds do not give this formula. This is not the text of the book.",
+  "kind": "clause",
+  "merged": []
+ },
+ {
+  "chunk_id": "punmiafoundations#24.2",
+  "code_id": null,
+  "code": "Punmia, Soil Mechanics and Foundations, 17th edition",
+  "code_norm": "punmia,soilmechanicsandfoundations,17thedition",
+  "clause": "Cl. 24.2",
+  "heading": "Minimum depth of foundation by Rankine's formula",
+  "text": "24.2 Minimum depth of foundation by Rankine's formula\nRankine's formula gives the minimum depth of a foundation as Df = (q/γ) × ((1 − sin φ)/(1 + sin φ))², where q is the gross bearing pressure on the soil, γ the unit weight of the soil and φ its angle of shearing resistance. It is Punmia's Equation 24.8 in Section 24.2, page 677.",
+  "kind": "clause",
   "merged": []
  }
 ]

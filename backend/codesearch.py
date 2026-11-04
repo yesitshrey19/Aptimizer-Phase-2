@@ -520,7 +520,11 @@ def _resolve_code(stem: str, text: str) -> Tuple[Optional[str], str]:
         return cid, C.CODE_INDEX[cid]["code"]
     if named:
         return None, named
-    return None, stem.upper()
+    # A textbook or circular names itself on its first line ("Punmia, Soil Mechanics and
+    # Foundations — ..."); that reads better in a citation than the file name in capitals.
+    first = (text or "").strip().splitlines()[0] if (text or "").strip() else ""
+    title = re.split(r"\s+[—–-]\s+", first, maxsplit=1)[0].strip()
+    return None, title if 0 < len(title) <= 80 else stem.upper()
 
 
 def _edition(designation: str) -> Optional[str]:

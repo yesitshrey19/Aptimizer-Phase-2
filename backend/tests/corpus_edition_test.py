@@ -27,3 +27,8 @@ def test_the_word_is_before_a_number_is_not_a_code():
     cited = found["resolved"] + found["code_only"] + found["unverified"]
     assert not any(c.lower().startswith("is 30") for c in cited)
     assert any("456" in c for c in cited)
+
+
+def test_a_textbook_file_is_named_by_its_title():
+    text = "Punmia, Soil Mechanics and Foundations, 17th edition — textbook formulas (checked facts)\n"
+    assert codesearch._resolve_code("punmia_foundations", text) == (None, "Punmia, Soil Mechanics and Foundations, 17th edition")

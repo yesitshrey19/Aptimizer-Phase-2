@@ -1,12 +1,13 @@
 {
  "embed_model": "gemini-embedding-001",
  "dimension": 3072,
- "chunk_count": 79,
- "built_at": "2026-11-04T08:34:34Z",
+ "chunk_count": 91,
+ "built_at": "2026-11-05T03:59:13Z",
  "files": {
   "is10262.md": "db50b00a32ca77605517e21a6d933d78a2e49123c8aa69894e591b6ddf173dd1",
   "is1172.md": "76e61fad211f135bb6e6dc2125cd82e98a97d6f4591960d651c8a9f3abb40f03",
   "is13920_1993.md": "4ce2337769cfd6a0bf9bfee20640688fd7e8e7ca2083b72398f0196a4b86f5dd",
+  "is1893.md": "bf533e0390f8282a9b6a523493d3558ef90d6b7969bd29ec690395516eb7abc1",
   "is1893_2002.md": "6961585773fe23f67da1533fa5ba57f3e4eb746241a0d3297bac243113ca87d2",
   "is1904.md": "4280c6c541f6ec325aec4b7d830d11fc4f164b39b30ca3c2fa6a939a90c7c076",
   "is456.md": "00497f299a3c717b4868c12de40febc6ce0ff3ad20d71fe8a16389b98ebe747e",
@@ -31,41 +32,45 @@
    10,
    12
   ],
-  "is1893_2002.md": [
+  "is1893.md": [
    12,
-   25
+   24
+  ],
+  "is1893_2002.md": [
+   24,
+   37
   ],
   "is1904.md": [
-   25,
-   27
+   37,
+   39
   ],
   "is456.md": [
-   27,
-   50
-  ],
-  "is875_1.md": [
-   50,
-   52
-  ],
-  "is875_2.md": [
-   52,
-   55
-  ],
-  "is875_3.md": [
-   55,
+   39,
    62
   ],
-  "nbc3.md": [
+  "is875_1.md": [
    62,
-   68
+   64
+  ],
+  "is875_2.md": [
+   64,
+   67
+  ],
+  "is875_3.md": [
+   67,
+   74
+  ],
+  "nbc3.md": [
+   74,
+   80
   ],
   "nbc4.md": [
-   68,
-   77
+   80,
+   89
   ],
   "punmia_foundations.md": [
-   77,
-   79
+   89,
+   91
   ]
  }
 }
